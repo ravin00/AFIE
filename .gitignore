@@ -1,5 +1,0 @@
-bin/,
-obj/, 
-.venv/, 
-node_modules/, 
-appsettings.Development.json
