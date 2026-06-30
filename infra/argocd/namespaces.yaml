@@ -1,0 +1,162 @@
+apiVersion: v1
+items:
+- apiVersion: v1
+  kind: Namespace
+  metadata:
+    creationTimestamp: "2026-06-30T08:07:21Z"
+    labels:
+      kubernetes.io/metadata.name: afie-system
+    name: afie-system
+    resourceVersion: "1681"
+    uid: 6d4faaad-4d32-4224-bff1-844c886ad8f5
+  spec:
+    finalizers:
+    - kubernetes
+  status:
+    phase: Active
+- apiVersion: v1
+  kind: Namespace
+  metadata:
+    creationTimestamp: "2026-06-30T08:07:21Z"
+    labels:
+      kubernetes.io/metadata.name: baseline-afie
+    name: baseline-afie
+    resourceVersion: "1693"
+    uid: d6a3db52-0d4a-40d8-9c2b-11f13122d7b9
+  spec:
+    finalizers:
+    - kubernetes
+  status:
+    phase: Active
+- apiVersion: v1
+  kind: Namespace
+  metadata:
+    creationTimestamp: "2026-06-30T08:07:21Z"
+    labels:
+      kubernetes.io/metadata.name: baseline-manual
+    name: baseline-manual
+    resourceVersion: "1684"
+    uid: eda1095b-21db-4637-a54f-dca6e20e5bc1
+  spec:
+    finalizers:
+    - kubernetes
+  status:
+    phase: Active
+- apiVersion: v1
+  kind: Namespace
+  metadata:
+    creationTimestamp: "2026-06-30T08:07:21Z"
+    labels:
+      kubernetes.io/metadata.name: baseline-threshold
+    name: baseline-threshold
+    resourceVersion: "1690"
+    uid: 0687ef07-c229-4de5-bbb9-f8e3a9e427e8
+  spec:
+    finalizers:
+    - kubernetes
+  status:
+    phase: Active
+- apiVersion: v1
+  kind: Namespace
+  metadata:
+    creationTimestamp: "2026-06-30T08:07:21Z"
+    labels:
+      kubernetes.io/metadata.name: baseline-vpa
+    name: baseline-vpa
+    resourceVersion: "1687"
+    uid: 44d43664-7a0b-4096-b6a2-26ff12d5404d
+  spec:
+    finalizers:
+    - kubernetes
+  status:
+    phase: Active
+- apiVersion: v1
+  kind: Namespace
+  metadata:
+    creationTimestamp: "2026-06-30T07:52:38Z"
+    labels:
+      kubernetes.io/metadata.name: default
+    name: default
+    resourceVersion: "19"
+    uid: 7a088e6a-7e56-486f-8726-82ac02e8be7b
+  spec:
+    finalizers:
+    - kubernetes
+  status:
+    phase: Active
+- apiVersion: v1
+  kind: Namespace
+  metadata:
+    creationTimestamp: "2026-06-30T07:52:38Z"
+    labels:
+      kubernetes.io/metadata.name: kube-node-lease
+    name: kube-node-lease
+    resourceVersion: "27"
+    uid: 8de5ffb9-9e9c-4795-b34e-8bc0d8d6529f
+  spec:
+    finalizers:
+    - kubernetes
+  status:
+    phase: Active
+- apiVersion: v1
+  kind: Namespace
+  metadata:
+    creationTimestamp: "2026-06-30T07:52:38Z"
+    labels:
+      kubernetes.io/metadata.name: kube-public
+    name: kube-public
+    resourceVersion: "12"
+    uid: af0b6887-681d-44bb-9162-bf79935c554a
+  spec:
+    finalizers:
+    - kubernetes
+  status:
+    phase: Active
+- apiVersion: v1
+  kind: Namespace
+  metadata:
+    creationTimestamp: "2026-06-30T07:52:38Z"
+    labels:
+      kubernetes.io/metadata.name: kube-system
+    name: kube-system
+    resourceVersion: "5"
+    uid: 513f493b-b5f6-4332-8b03-5fa8ff6e1e7e
+  spec:
+    finalizers:
+    - kubernetes
+  status:
+    phase: Active
+- apiVersion: v1
+  kind: Namespace
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"v1","kind":"Namespace","metadata":{"annotations":{},"name":"local-path-storage"}}
+    creationTimestamp: "2026-06-30T07:52:42Z"
+    labels:
+      kubernetes.io/metadata.name: local-path-storage
+    name: local-path-storage
+    resourceVersion: "291"
+    uid: a8eb76cb-b1b4-4a6b-9813-ab1534cb57c5
+  spec:
+    finalizers:
+    - kubernetes
+  status:
+    phase: Active
+- apiVersion: v1
+  kind: Namespace
+  metadata:
+    creationTimestamp: "2026-06-30T08:07:10Z"
+    labels:
+      kubernetes.io/metadata.name: monitoring
+    name: monitoring
+    resourceVersion: "1664"
+    uid: f0df05ac-ddd6-4f9d-9b64-ad68c695134c
+  spec:
+    finalizers:
+    - kubernetes
+  status:
+    phase: Active
+kind: List
+metadata:
+  resourceVersion: ""
