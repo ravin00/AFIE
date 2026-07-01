@@ -1,2 +1,7 @@
 <Solution>
+  <Folder Name="/src/" />
+  <Folder Name="/src/api/" />
+  <Folder Name="/src/api/telemetry/">
+    <Project Path="src/api/telemetry/AFIE.Telemetry.csproj" />
+  </Folder>
 </Solution>

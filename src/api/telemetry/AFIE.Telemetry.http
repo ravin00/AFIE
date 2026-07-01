@@ -1,0 +1,6 @@
+@AFIE.Telemetry_HostAddress = http://localhost:5043
+
+GET {{AFIE.Telemetry_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
