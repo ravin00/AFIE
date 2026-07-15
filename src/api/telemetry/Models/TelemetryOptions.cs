@@ -13,3 +13,6 @@ public class EventHubOptions
     public string? FullyQualifiedNamespace { get; set; }
     public string EventHubName { get; set; } = "telemetry-events";
 }
+
+
+
