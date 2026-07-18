@@ -117,8 +117,13 @@ public partial class PrometheusScraperService : BackgroundService
             r.Metric.TryGetValue("namespace", out var n) && n == ns);
 
         if (match?.Value is [_, var valObj] &&
-            double.TryParse(valObj?.ToString(), out var val) &&
-            !double.IsNaN(val))
+            double.TryParse(
+                valObj?.ToString(),
+                System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var val) &&
+            !double.IsNaN(val) &&
+            !double.IsInfinity(val))
             return val;
 
         return 0;
