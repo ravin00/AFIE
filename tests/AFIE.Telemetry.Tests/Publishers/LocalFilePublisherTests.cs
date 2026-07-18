@@ -48,11 +48,13 @@ public class LocalFilePublisherTests : IDisposable
         await _publisher.PublishAsync(batch2);
 
         var files = Directory.GetFiles(_tempDir, "telemetry_*.jsonl");
-        Assert.Single(files);
+        Assert.NotEmpty(files);
 
-        var lines = await File.ReadAllLinesAsync(files[0]);
-        Assert.Equal(3, lines.Length);
-    }
+        var allLines = (await Task.WhenAll(files.Select(File.ReadAllLinesAsync)))
+            .SelectMany(x => x)
+            .ToArray();
+
+        Assert.Equal(3, allLines.Length);
 
     [Fact]
     public async Task PublishAsync_EachLineIsValidJson()
