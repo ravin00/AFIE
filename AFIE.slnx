@@ -4,4 +4,7 @@
   <Folder Name="/src/api/telemetry/">
     <Project Path="src/api/telemetry/AFIE.Telemetry.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/AFIE.Telemetry.Tests/AFIE.Telemetry.Tests.csproj" />
+  </Folder>
 </Solution>
