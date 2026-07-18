@@ -13,7 +13,11 @@ builder.Services.Configure<EventHubOptions>(builder.Configuration.GetSection("Ev
 
 builder.Services.AddHttpClient<PrometheusHttpClient>(client =>
 {
-    client.BaseAddress = new Uri(telemetrySection["PrometheusUrl"]!);
+    var prometheusUrl = telemetrySection["PrometheusUrl"];
+    if (string.IsNullOrWhiteSpace(prometheusUrl))
+        throw new InvalidOperationException("Telemetry:PrometheusUrl must be configured.");
+
+    client.BaseAddress = new Uri(prometheusUrl);
     client.Timeout = TimeSpan.FromSeconds(10);
 });
 
