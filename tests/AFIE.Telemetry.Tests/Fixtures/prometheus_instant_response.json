@@ -1,0 +1,22 @@
+{
+  "status": "success",
+  "data": {
+    "resultType": "vector",
+    "result": [
+      {
+        "metric": {
+          "pod": "nginx-deployment-5d6f7b8c9-x4k2j",
+          "namespace": "baseline-afie"
+        },
+        "value": [1719849600, "0.25"]
+      },
+      {
+        "metric": {
+          "pod": "redis-master-0",
+          "namespace": "baseline-afie"
+        },
+        "value": [1719849600, "0.10"]
+      }
+    ]
+  }
+}
