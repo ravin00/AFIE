@@ -1,0 +1,50 @@
+# Phase 2 end-to-end test workload (doc step 2.9).
+# Proves the cluster can run a workload, Prometheus can scrape it, and the
+# Grafana pods dashboard (ID 15757) shows it. Committed (instead of an ad-hoc
+# `kubectl create`) so it's reproducible and reconciled by the ArgoCD Application.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx
+  namespace: afie-system
+  labels:
+    app: nginx
+    app.kubernetes.io/part-of: afie
+    afie.dev/purpose: smoke-test
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:stable
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx
+  namespace: afie-system
+  labels:
+    app: nginx
+spec:
+  selector:
+    app: nginx
+  ports:
+    - port: 80
+      targetPort: 80
+  type: ClusterIP
