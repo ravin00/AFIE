@@ -3,9 +3,9 @@ WORKDIR /src
 COPY src/api/telemetry/AFIE.Telemetry.csproj ./
 RUN dotnet restore
 COPY src/api/telemetry/ ./
-RUN dotnet publish -c Release -o /app --no-restore
+RUN dotnet publish -c Release -o /app
 
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine AS runtime
 WORKDIR /app
 COPY --from=build /app .
 RUN mkdir -p /app/data
