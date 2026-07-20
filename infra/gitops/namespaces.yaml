@@ -1,0 +1,56 @@
+# AFIE Phase 2 — project namespaces (declarative, GitOps-managed).
+# Applied by scripts/setup-phase2.sh and reconciled by the ArgoCD Application
+# in infra/gitops/argocd/app-afie.yaml. Cluster/system namespaces are omitted
+# on purpose so ArgoCD only owns AFIE's own namespaces.
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    app.kubernetes.io/part-of: afie
+    afie.dev/purpose: observability
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: afie-system
+  labels:
+    app.kubernetes.io/part-of: afie
+    afie.dev/purpose: platform
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: baseline-manual
+  labels:
+    app.kubernetes.io/part-of: afie
+    afie.dev/purpose: baseline
+    afie.dev/baseline: manual
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: baseline-vpa
+  labels:
+    app.kubernetes.io/part-of: afie
+    afie.dev/purpose: baseline
+    afie.dev/baseline: vpa
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: baseline-threshold
+  labels:
+    app.kubernetes.io/part-of: afie
+    afie.dev/purpose: baseline
+    afie.dev/baseline: threshold
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: baseline-afie
+  labels:
+    app.kubernetes.io/part-of: afie
+    afie.dev/purpose: baseline
+    afie.dev/baseline: afie

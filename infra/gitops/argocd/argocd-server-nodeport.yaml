@@ -1,0 +1,30 @@
+# NodePort override for the ArgoCD API/UI server.
+# The KIND config (scripts/kind-config.yaml) maps host 8080 -> node 30080,
+# so this makes the ArgoCD dashboard reachable at http://localhost:8080
+# without a manual `kubectl port-forward`.
+#
+# Apply AFTER the upstream ArgoCD install (which creates the argocd-server
+# Service as ClusterIP); this patches it to NodePort. setup-phase2.sh also
+# sets the server to --insecure so port 80 serves the UI over the NodePort.
+apiVersion: v1
+kind: Service
+metadata:
+  name: argocd-server
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-server
+    app.kubernetes.io/part-of: argocd
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: argocd-server
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: 8080
+      nodePort: 30080
+    - name: https
+      protocol: TCP
+      port: 443
+      targetPort: 8080

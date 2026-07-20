@@ -1,0 +1,27 @@
+# Helm values for kube-prometheus-stack (Phase 2 observability).
+# Used by: helm install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
+#            --namespace monitoring -f infra/gitops/monitoring/kube-prometheus-stack.values.yaml
+#
+# NodePorts here line up with scripts/kind-config.yaml host mappings:
+#   Grafana    node 30000 -> host 3000  -> http://localhost:3000
+#   Prometheus node 30090 -> host 9090  -> http://localhost:9090
+# so the stack is reachable without manual port-forwarding.
+
+prometheus:
+  prometheusSpec:
+    # Matches doc step 2.3.
+    retention: 7d
+  service:
+    type: NodePort
+    nodePort: 30090
+
+grafana:
+  service:
+    type: NodePort
+    nodePort: 30000
+  # Default login remains admin / prom-operator; change it after first login.
+  # Do NOT commit a real password here.
+
+alertmanager:
+  service:
+    type: ClusterIP
