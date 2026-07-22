@@ -8,17 +8,15 @@ using Microsoft.Extensions.Options;
 
 namespace AFIE.Telemetry.Publishers;
 
-public class EventHubPublisher : IMetricPublisher, IAsyncDisposable
+public class EventHubPublisher : MetricPublisherBase, IAsyncDisposable
 {
+    public const string ModeName = "eventhub";
+
     private readonly EventHubProducerClient _producer;
     private readonly ILogger<EventHubPublisher> _logger;
 
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-    };
-
     public EventHubPublisher(IOptions<EventHubOptions> options, ILogger<EventHubPublisher> logger)
+        : base(logger)
     {
         _logger = logger;
         _producer = new EventHubProducerClient(
@@ -27,10 +25,11 @@ public class EventHubPublisher : IMetricPublisher, IAsyncDisposable
             new DefaultAzureCredential());
     }
 
-    public async Task PublishAsync(IReadOnlyList<MetricEvent> events, CancellationToken ct = default)
-    {
-        if (events.Count == 0) return;
+    public override string Mode => ModeName;
 
+    protected override async Task<string> PublishBatchAsync(
+        IReadOnlyList<MetricEvent> events, CancellationToken ct)
+    {
         var grouped = events.GroupBy(e => e.WorkloadName);
 
         foreach (var group in grouped)
@@ -52,7 +51,7 @@ public class EventHubPublisher : IMetricPublisher, IAsyncDisposable
             await _producer.SendAsync(batch, ct);
         }
 
-        _logger.LogInformation("Published {Count} events to Event Hub", events.Count);
+        return _producer.EventHubName;
     }
 
     public async ValueTask DisposeAsync()
