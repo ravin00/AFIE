@@ -25,6 +25,8 @@ builder.Services.AddSingleton<TelemetryHealthState>();
 
 builder.Services.AddSingleton<LocalFilePublisher>();
 builder.Services.AddSingleton<EventHubPublisher>();
+builder.Services.AddSingleton(sp => new Lazy<LocalFilePublisher>(sp.GetRequiredService<LocalFilePublisher>));
+builder.Services.AddSingleton(sp => new Lazy<EventHubPublisher>(sp.GetRequiredService<EventHubPublisher>));
 builder.Services.AddSingleton<MetricPublisherStrategyResolver>();
 builder.Services.AddSingleton<IMetricPublisher>(sp =>
     sp.GetRequiredService<MetricPublisherStrategyResolver>().Resolve());
