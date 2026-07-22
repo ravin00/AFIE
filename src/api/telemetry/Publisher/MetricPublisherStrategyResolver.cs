@@ -9,13 +9,14 @@ public class MetricPublisherStrategyResolver
     private readonly string _mode;
 
     public MetricPublisherStrategyResolver(
-        IServiceProvider services,
+        Lazy<LocalFilePublisher> local,
+        Lazy<EventHubPublisher> eventHub,
         IOptions<TelemetryOptions> options)
     {
         _strategies = new(StringComparer.OrdinalIgnoreCase)
         {
-            [LocalFilePublisher.ModeName] = services.GetRequiredService<LocalFilePublisher>,
-            [EventHubPublisher.ModeName] = services.GetRequiredService<EventHubPublisher>,
+            [LocalFilePublisher.ModeName] = () => local.Value,
+            [EventHubPublisher.ModeName] = () => eventHub.Value,
         };
         _mode = options.Value.OutputMode;
     }
