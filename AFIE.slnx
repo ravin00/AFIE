@@ -7,4 +7,7 @@
   <Folder Name="/tests/">
     <Project Path="tests/AFIE.Telemetry.Tests/AFIE.Telemetry.Tests.csproj" />
   </Folder>
+  <Folder Name="/src/shared/">
+  <Project Path="src/shared/AFIE.Contracts/AFIE.Contracts.csproj" />
+</Folder>
 </Solution>
