@@ -3,11 +3,11 @@ using System.Text.Json;
 using Azure.Identity;
 using Azure.Messaging.EventHubs;
 using Azure.Messaging.EventHubs.Producer;
+using AFIE.Contracts;
 using AFIE.Telemetry.Models;
 using Microsoft.Extensions.Options;
 
 namespace AFIE.Telemetry.Publishers;
-
 public class EventHubPublisher : MetricPublisherBase, IAsyncDisposable
 {
     public const string ModeName = "eventhub";
