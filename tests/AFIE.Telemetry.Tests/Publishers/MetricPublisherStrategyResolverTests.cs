@@ -43,6 +43,43 @@ public class MetricPublisherStrategyResolverTests
     }
 
     [Fact]
+    public void Resolve_TrimsSurroundingWhitespace()
+    {
+        var local = BuildLocalPublisher();
+        var resolver = BuildResolver(local, eventHubFactory: FailIfBuilt, mode: "  local  ");
+
+        var result = resolver.Resolve();
+
+        Assert.Same(local, result);
+    }
+
+    [Fact]
+    public void Resolve_WithNullMode_ThrowsInvalidOperationException()
+    {
+        var resolver = BuildResolver(
+            BuildLocalPublisher(),
+            eventHubFactory: FailIfBuilt,
+            mode: null!);
+
+        var ex = Assert.Throws<InvalidOperationException>(() => resolver.Resolve());
+        Assert.Contains(LocalFilePublisher.ModeName, ex.Message);
+        Assert.Contains(EventHubPublisher.ModeName, ex.Message);
+    }
+
+    [Fact]
+    public void Resolve_WithWhitespaceMode_ThrowsInvalidOperationException()
+    {
+        var resolver = BuildResolver(
+            BuildLocalPublisher(),
+            eventHubFactory: FailIfBuilt,
+            mode: "   ");
+
+        var ex = Assert.Throws<InvalidOperationException>(() => resolver.Resolve());
+        Assert.Contains(LocalFilePublisher.ModeName, ex.Message);
+        Assert.Contains(EventHubPublisher.ModeName, ex.Message);
+    }
+
+    [Fact]
     public void Resolve_WithUnknownMode_ThrowsInvalidOperationException()
     {
         var resolver = BuildResolver(
