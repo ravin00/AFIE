@@ -1,0 +1,158 @@
+name: AI Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get diff of the pull request
+        id: get_diff
+        shell: bash
+        env:
+          PULL_REQUEST_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PULL_REQUEST_BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |-
+          git fetch origin "$PULL_REQUEST_HEAD_REF"
+          git fetch origin "$PULL_REQUEST_BASE_REF"
+          git checkout "$PULL_REQUEST_HEAD_REF"
+          git diff "origin/$PULL_REQUEST_BASE_REF" \
+            ':(exclude)**/bin/**' \
+            ':(exclude)**/obj/**' \
+            ':(exclude)**/*.Designer.cs' \
+            ':(exclude)**/*.g.cs' \
+            ':(exclude)**/*.g.i.cs' \
+            ':(exclude)**/Migrations/**' \
+            ':(exclude)*.csproj' \
+            ':(exclude)*.sln' \
+            ':(exclude)packages.lock.json' \
+            > diff.txt
+          {
+            echo "pull_request_diff<<EOF"
+            cat diff.txt
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: rubensflinco/gemini-code-review-action@1.0.5
+        name: Code Review by Gemini AI
+        with:
+          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_repository: ${{ github.repository }}
+          github_pull_request_number: ${{ github.event.pull_request.number }}
+          git_commit_hash: ${{ github.event.pull_request.head.sha }}
+          model: "gemini-1.5-pro-latest"
+          pull_request_diff: |-
+            ${{ steps.get_diff.outputs.pull_request_diff }}
+          pull_request_chunk_size: "3500"
+          extra_prompt: |-
+            Act as a Senior Software Engineer, Staff Engineer, Security Engineer, and Code Reviewer.
+            Perform a comprehensive review of this Pull Request as if it were being reviewed before merging into a production codebase.
+            The codebase is C#/.NET — apply .NET-specific best practices throughout.
+
+            Review the PR for the following:
+
+            ## 1. Code Quality
+            - Readability and maintainability
+            - Naming conventions
+            - Code duplication
+            - SOLID principles
+            - DRY, KISS, and YAGNI
+            - Separation of concerns
+            - Clean architecture adherence
+            - Proper abstraction
+            - Error handling
+            - Logging quality
+            - Null/undefined safety
+            - Type safety
+            - Dead code
+            - Unnecessary complexity
+
+            ## 2. Architecture
+            - Scalability
+            - Extensibility
+            - Coupling/cohesion
+            - Layer violations
+            - Dependency management
+            - Design patterns
+            - Future maintainability
+
+            ## 3. Security (OWASP mindset)
+            - Authentication / authorization flaws
+            - Injection (SQL/NoSQL/command)
+            - XSS, CSRF, SSRF
+            - Path traversal
+            - Insecure deserialization
+            - Secret exposure / sensitive logging
+            - Token handling
+            - Input validation / output encoding
+            - Rate limiting
+            - File upload vulnerabilities
+            - Dependency risks
+
+            ## 4. Performance
+            - Expensive operations, N+1 queries, memory allocations
+            - Async correctness, blocking operations
+            - Database / network efficiency, caching, algorithmic complexity
+
+            ## 5. Reliability
+            - Race conditions, concurrency, thread safety
+            - Retry logic, timeouts, idempotency, resource leaks
+
+            ## 6. Testing
+            - Unit / integration test sufficiency
+            - Edge cases, failure cases, security tests
+            - Suggest additional tests where appropriate
+
+            ## 7. API Design
+            - REST best practices, HTTP status codes
+            - Validation, error responses, versioning, DTO design
+
+            ## 8. DevOps
+            - Configuration, env vars, infrastructure, Docker, CI/CD, Kubernetes
+
+            ## 9. Language & Framework Best Practices
+            Apply official .NET / C# best practices.
+
+            ## 10. Documentation
+            - Missing comments, API docs, README, migration notes, breaking changes
+
+            ## 11. Industry Best Practices
+            Compare against Microsoft / Google / Amazon / Meta / Stripe / Netflix standards.
+            Highlight anti-patterns, technical debt, better/simpler alternatives.
+
+            ## 12. Review Output — organize findings into:
+            🔴 Critical (must fix before merge)
+            🟠 High Priority
+            🟡 Medium Priority
+            🟢 Minor Suggestions
+            💡 Nice Improvements
+
+            For every issue include:
+            1. Why it is a problem
+            2. Potential risks
+            3. Recommended solution
+            4. Example code if applicable
+
+            Finally provide:
+            - Overall code quality score (/10)
+            - Security score (/10)
+            - Maintainability score (/10)
+            - Performance score (/10)
+            - Test coverage confidence (/10)
+            - Merge recommendation (Approve / Approve with Changes / Request Changes)
+
+            Be extremely thorough. Think like a senior reviewer responsible for production reliability,
+            long-term maintainability, and security. Identify subtle issues, architectural concerns,
+            and improvements — not just obvious bugs.
+          log_level: "INFO"
