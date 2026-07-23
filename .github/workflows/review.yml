@@ -20,13 +20,10 @@ jobs:
         id: get_diff
         shell: bash
         env:
-          PULL_REQUEST_HEAD_REF: ${{ github.event.pull_request.head.ref }}
-          PULL_REQUEST_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |-
-          git fetch origin "$PULL_REQUEST_HEAD_REF"
-          git fetch origin "$PULL_REQUEST_BASE_REF"
-          git checkout "$PULL_REQUEST_HEAD_REF"
-          git diff "origin/$PULL_REQUEST_BASE_REF" \
+          git diff "$BASE_SHA" "$HEAD_SHA" \
             ':(exclude)**/bin/**' \
             ':(exclude)**/obj/**' \
             ':(exclude)**/*.Designer.cs' \
