@@ -5,10 +5,6 @@ system that scrapes cluster telemetry, learns a resource-adjustment policy
 with reinforcement learning, validates each recommendation against a policy
 engine, and applies changes through GitOps pull requests.
 
-This directory contains the engineering documentation. The IEEE paper drafts
-live under `../paper/`; the phase-by-phase implementation workflow lives in
-`AFIE_Workflow_updated.docx` at the repo owner's desktop.
-
 ## Start here
 
 | Doc | What it covers |
