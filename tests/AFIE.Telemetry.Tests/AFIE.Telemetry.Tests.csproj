@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\api\telemetry\AFIE.Telemetry.csproj" />
+    <ProjectReference Include="..\..\src\shared\AFIE.Contracts\AFIE.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>
