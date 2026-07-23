@@ -12,6 +12,17 @@ jobs:
   review:
     runs-on: ubuntu-latest
     steps:
+      - name: Verify GEMINI_API_KEY secret is set
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          if [ -z "$GEMINI_API_KEY" ]; then
+            echo "::error::GEMINI_API_KEY repository secret is missing or empty."
+            echo "Add it at: repo → Settings → Secrets and variables → Actions → New repository secret"
+            exit 1
+          fi
+          echo "GEMINI_API_KEY is set (length: ${#GEMINI_API_KEY})"
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
