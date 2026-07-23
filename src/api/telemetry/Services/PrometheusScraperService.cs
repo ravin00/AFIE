@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using AFIE.Telemetry.Clients;
+using AFIE.Contracts;
 using AFIE.Telemetry.Models;
 using AFIE.Telemetry.Publishers;
 using AFIE.Telemetry.Queries;
