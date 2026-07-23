@@ -18,7 +18,7 @@ public class MetricPublisherStrategyResolver
             [LocalFilePublisher.ModeName] = () => local.Value,
             [EventHubPublisher.ModeName] = () => eventHub.Value,
         };
-        _mode = options.Value.OutputMode;
+        _mode = options.Value.OutputMode?.Trim() ?? string.Empty;
     }
 
     public IMetricPublisher Resolve()
