@@ -1,4 +1,4 @@
-using AFIE.Telemetry.Models;
+using AFIE.Contracts;
 
 
 namespace AFIE.Telemetry.Publishers;
