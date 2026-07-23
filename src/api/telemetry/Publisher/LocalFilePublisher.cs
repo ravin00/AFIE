@@ -1,4 +1,5 @@
 using System.Text.Json;
+using AFIE.Contracts;
 using AFIE.Telemetry.Models;
 using Microsoft.Extensions.Options;
 
