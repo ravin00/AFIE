@@ -1,4 +1,4 @@
-namespace AFIE.Telemetry.Models;
+namespace AFIE.Contracts;
 
 public record MetricEvent(
     string WorkloadName,
@@ -17,4 +17,4 @@ public record MetricEvent(
     double CpuLimit,
     double MemRequest,
     double MemLimit
-); 
+);
