@@ -1,10 +1,14 @@
 <Solution>
   <Folder Name="/src/" />
   <Folder Name="/src/api/" />
+  <Folder Name="/src/api/feature-engineering/">
+    <Project Path="src/api/feature-engineering/AFIE.FeatureEngineering.csproj" />
+  </Folder>
   <Folder Name="/src/api/telemetry/">
     <Project Path="src/api/telemetry/AFIE.Telemetry.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/AFIE.FeatureEngineering.Tests/AFIE.FeatureEngineering.Tests.csproj" />
     <Project Path="tests/AFIE.Telemetry.Tests/AFIE.Telemetry.Tests.csproj" />
   </Folder>
   <Folder Name="/src/shared/">
