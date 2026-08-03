@@ -1,0 +1,6 @@
+@AFIE.FeatureEngineering_HostAddress = http://localhost:5236
+
+GET {{AFIE.FeatureEngineering_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
