@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using AFIE.Contracts;
 using AFIE.FeatureEngineering.Health;
@@ -90,35 +91,74 @@ public sealed class LocalJsonlTailConsumer : BackgroundService, IMetricEventCons
         await using var fs = new FileStream(activePath, FileMode.Open,
             FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
         fs.Seek(_offset.Offset, SeekOrigin.Begin);
-        using var reader = new StreamReader(fs);
 
-        string? line;
-        while ((line = await reader.ReadLineAsync(ct)) is not null)
+        var fileName = Path.GetFileName(activePath);
+        var confirmedOffset = _offset.Offset;
+        var buffer = new byte[8192];
+        var pending = new List<byte>(256);
+
+        try
         {
-            if (string.IsNullOrWhiteSpace(line)) continue;
-            try
+            while (true)
             {
-                var evt = JsonSerializer.Deserialize<MetricEvent>(line, JsonOptions);
-                if (evt is null) continue;
-                _store.Add(evt);
-                _health.LastEventConsumedTime = DateTimeOffset.UtcNow;
-                _health.EventsConsumedTotal++;
-                if (++_sinceLastFlush >= OffsetFlushEveryN)
+                var read = await fs.ReadAsync(buffer.AsMemory(0, buffer.Length), ct);
+                if (read == 0) break;
+
+                var scanStart = 0;
+                for (var i = 0; i < read; i++)
                 {
-                    _offset = new OffsetState(Path.GetFileName(activePath), fs.Position, info.Length);
-                    FlushOffset();
-                    _sinceLastFlush = 0;
+                    if (buffer[i] != (byte)'\n') continue;
+
+                    var chunkLen = i - scanStart;
+                    var lineLen = pending.Count + chunkLen;
+                    var lineBytes = new byte[lineLen];
+                    if (pending.Count > 0)
+                    {
+                        pending.CopyTo(lineBytes, 0);
+                        pending.Clear();
+                    }
+                    Buffer.BlockCopy(buffer, scanStart, lineBytes, lineLen - chunkLen, chunkLen);
+
+                    confirmedOffset += lineLen + 1;
+                    scanStart = i + 1;
+
+                    var strLen = lineLen;
+                    if (strLen > 0 && lineBytes[strLen - 1] == (byte)'\r') strLen--;
+                    var line = Encoding.UTF8.GetString(lineBytes, 0, strLen);
+                    if (string.IsNullOrWhiteSpace(line)) continue;
+
+                    try
+                    {
+                        var evt = JsonSerializer.Deserialize<MetricEvent>(line, JsonOptions);
+                        if (evt is null) continue;
+                        _store.Add(evt);
+                        _health.LastEventConsumedTime = DateTimeOffset.UtcNow;
+                        _health.EventsConsumedTotal++;
+                        if (++_sinceLastFlush >= OffsetFlushEveryN)
+                        {
+                            _offset = new OffsetState(fileName, confirmedOffset, info.Length);
+                            FlushOffset();
+                            _sinceLastFlush = 0;
+                        }
+                    }
+                    catch (JsonException ex)
+                    {
+                        _logger.LogWarning(ex, "Skipping malformed JSONL line");
+                    }
+                }
+
+                if (scanStart < read)
+                {
+                    for (var j = scanStart; j < read; j++) pending.Add(buffer[j]);
                 }
             }
-            catch (JsonException ex)
-            {
-                _logger.LogWarning(ex, "Skipping malformed JSONL line");
-            }
         }
-
-        _offset = new OffsetState(Path.GetFileName(activePath), fs.Position, info.Length);
-        _health.SourceFileOffset = _offset.Offset;
-        FlushOffset();
+        finally
+        {
+            _offset = new OffsetState(fileName, confirmedOffset, info.Length);
+            _health.SourceFileOffset = _offset.Offset;
+            FlushOffset();
+        }
     }
 
     private static bool ShouldRollover(string activePath)
