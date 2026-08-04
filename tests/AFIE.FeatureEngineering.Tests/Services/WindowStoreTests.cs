@@ -29,6 +29,15 @@ public class WindowStoreTests
         Assert.Null(NewStore().Snapshot("missing"));
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void Ctor_InvalidWindowCapacity_Throws(int capacity)
+    {
+        var options = Options.Create(new FeatureEngineeringOptions { WindowCapacity = capacity });
+        Assert.Throws<ArgumentOutOfRangeException>(() => new WindowStore(options));
+    }
+
     [Fact]
     public void ConcurrentAdds_AllEventsRetained()
     {
