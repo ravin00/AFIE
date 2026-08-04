@@ -12,7 +12,13 @@ public sealed class WindowStore
 
     public WindowStore(IOptions<FeatureEngineeringOptions> options)
     {
-        _capacity = options.Value.WindowCapacity;
+        var capacity = options.Value.WindowCapacity;
+        if (capacity <= 0)
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                capacity,
+                $"{nameof(FeatureEngineeringOptions.WindowCapacity)} must be greater than zero.");
+        _capacity = capacity;
     }
 
     public void Add(MetricEvent evt)
