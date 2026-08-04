@@ -1,5 +1,7 @@
+using AFIE.FeatureEngineering.Models;
 using AFIE.FeatureEngineering.Services;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Options;
 
 namespace AFIE.FeatureEngineering.Health;
 
@@ -7,11 +9,16 @@ public sealed class FeatureEngineeringHealthCheck : IHealthCheck
 {
     private readonly FeatureEngineeringHealthState _state;
     private readonly WindowStore _store;
+    private readonly FeatureEngineeringOptions _options;
 
-    public FeatureEngineeringHealthCheck(FeatureEngineeringHealthState state, WindowStore store)
+    public FeatureEngineeringHealthCheck(
+        FeatureEngineeringHealthState state,
+        WindowStore store,
+        IOptions<FeatureEngineeringOptions> options)
     {
         _state = state;
         _store = store;
+        _options = options.Value;
     }
 
     public Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext ctx, CancellationToken ct = default)
@@ -30,8 +37,11 @@ public sealed class FeatureEngineeringHealthCheck : IHealthCheck
         if (_state.LastEventConsumedTime is null)
             return Task.FromResult(HealthCheckResult.Degraded("No events consumed yet", data: data));
 
-        if (!_state.SourceFileReachable || !_state.PostgresReachable)
-            return Task.FromResult(HealthCheckResult.Degraded("Source file or Postgres unreachable", data: data));
+        var staleness = DateTimeOffset.UtcNow - _state.LastEventConsumedTime.Value;
+        var threshold = TimeSpan.FromSeconds(_options.EventStalenessThresholdSeconds);
+
+        if (staleness > threshold || !_state.SourceFileReachable || !_state.PostgresReachable)
+            return Task.FromResult(HealthCheckResult.Degraded("Event stream stale or dependency unreachable", data: data));
 
         return Task.FromResult(HealthCheckResult.Healthy("OK", data));
     }
