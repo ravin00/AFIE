@@ -1,0 +1,1 @@
+{"workloadName":"nginx","namespace":"afie-system","timestamp":"2026-01-01T00:00:00Z","cpuUsageRate":0.5,"memoryBytes":104857600,"requestRatePerSecond":10,"errorRatePct":0,"latencyP50Ms":5,"latencyP95Ms":20,"latencyP99Ms":50,"nodeCpuPressure":false,"nodeMemPressure":false,"cpuRequest":0.1,"cpuLimit":1.0,"memRequest":67108864,"memLimit":209715200}

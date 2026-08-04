@@ -7,6 +7,9 @@ namespace AFIE.FeatureEngineering.Health;
 
 public sealed class FeatureEngineeringHealthCheck : IHealthCheck
 {
+    private const int TelemetryScrapeIntervalSeconds = 15;
+    private const int StalenessMultiplier = 3;
+
     private readonly FeatureEngineeringHealthState _state;
     private readonly WindowStore _store;
     private readonly FeatureEngineeringOptions _options;
@@ -31,17 +34,18 @@ public sealed class FeatureEngineeringHealthCheck : IHealthCheck
             ["sourceFileReachable"] = _state.SourceFileReachable,
             ["sourceFileOffset"] = _state.SourceFileOffset,
             ["postgresReachable"] = _state.PostgresReachable,
-            ["workloadsTracked"] = _store.WorkloadCount
+            ["workloadsTracked"] = _store.WorkloadCount,
+            ["consumerMode"] = _options.ConsumerMode
         };
 
         if (_state.LastEventConsumedTime is null)
             return Task.FromResult(HealthCheckResult.Degraded("No events consumed yet", data: data));
 
-        var staleness = DateTimeOffset.UtcNow - _state.LastEventConsumedTime.Value;
-        var threshold = TimeSpan.FromSeconds(_options.EventStalenessThresholdSeconds);
+        var stale = DateTimeOffset.UtcNow - _state.LastEventConsumedTime.Value;
+        var threshold = TimeSpan.FromSeconds(TelemetryScrapeIntervalSeconds * StalenessMultiplier);
 
-        if (staleness > threshold || !_state.SourceFileReachable || !_state.PostgresReachable)
-            return Task.FromResult(HealthCheckResult.Degraded("Event stream stale or dependency unreachable", data: data));
+        if (stale > threshold || !_state.SourceFileReachable)
+            return Task.FromResult(HealthCheckResult.Degraded("Consumer stale or source unreachable", data: data));
 
         return Task.FromResult(HealthCheckResult.Healthy("OK", data));
     }

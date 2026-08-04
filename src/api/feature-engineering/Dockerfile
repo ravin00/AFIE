@@ -10,7 +10,9 @@ RUN dotnet publish api/feature-engineering/AFIE.FeatureEngineering.csproj -c Rel
 FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine AS runtime
 WORKDIR /app
 COPY --from=build /app .
+RUN mkdir -p /app/experiments/results /app/experiments/state \
+    && chown -R app:app /app/experiments
+USER app
 ENV ASPNETCORE_URLS=http://+:8080
 EXPOSE 8080
-USER app
 ENTRYPOINT ["dotnet", "AFIE.FeatureEngineering.dll"]
