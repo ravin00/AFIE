@@ -27,6 +27,12 @@ public sealed class FeatureEngineeringHealthCheck : IHealthCheck
             ["workloadsTracked"] = _store.WorkloadCount
         };
 
+        if (_state.LastEventConsumedTime is null)
+            return Task.FromResult(HealthCheckResult.Degraded("No events consumed yet", data: data));
+
+        if (!_state.SourceFileReachable || !_state.PostgresReachable)
+            return Task.FromResult(HealthCheckResult.Degraded("Source file or Postgres unreachable", data: data));
+
         return Task.FromResult(HealthCheckResult.Healthy("OK", data));
     }
 
