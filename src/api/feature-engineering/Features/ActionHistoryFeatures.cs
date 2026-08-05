@@ -13,7 +13,7 @@ public sealed class ActionHistoryFeatures : IFeatureGroup
         for (var i = 0; i < take; i++)
         {
             var record = history[history.Length - 1 - i];  // most recent first
-            var minutesScaled = Math.Min((ctx.Now - record.Timestamp).TotalMinutes / 60.0, 1.0);
+            var minutesScaled = Math.Clamp((ctx.Now - record.Timestamp).TotalMinutes / 60.0, 0.0,1.0);
             dest[i * 3 + 0] = (float)Math.Clamp(record.CostDelta, -1.0, 1.0);
             dest[i * 3 + 1] = (float)Math.Clamp(record.SloDelta, -1.0, 1.0);
             dest[i * 3 + 2] = (float)minutesScaled;
