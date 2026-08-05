@@ -18,6 +18,6 @@ public sealed class NodePressureFeatures : IFeatureGroup
 
         var cpuUtil = latest.CpuUsageRate / Math.Max(latest.CpuLimit, Eps);
         var memUtil = latest.MemoryBytes / Math.Max(latest.MemLimit, Eps);
-        dest[2] = (float)Math.Min(Math.Max(cpuUtil, memUtil), 1.0);
+        dest[2] = (float)Math.Clamp(Math.Max(cpuUtil, memUtil), 0.0,1.0);
     }
 }
