@@ -11,7 +11,10 @@ using Npgsql;
 var builder = WebApplication.CreateBuilder(args);
 
 var section = builder.Configuration.GetSection("FeatureEngineering");
-builder.Services.Configure<FeatureEngineeringOptions>(section);
+builder.Services.AddOptions<FeatureEngineeringOptions>()
+    .Bind(section)
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
 builder.Services.Configure<EventHubOptions>(builder.Configuration.GetSection("EventHub"));
 
 var postgresConnectionString = section["PostgresConnectionString"];
