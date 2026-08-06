@@ -20,8 +20,8 @@ public sealed class TemporalFeatures : IFeatureGroup
         dest[3] = (float)Math.Cos(dowAngle);
 
         var age = ctx.Samples.Length > 0
-            ? (ctx.Now - ctx.Samples[0].Timestamp).TotalDays
+            ? Math.Clamp((ctx.Now - ctx.Samples[^1].Timestamp).TotalDays,0,365)
             : 0;
-        dest[4] = (float)Math.Min(age / 365.0, 1.0);
+        dest[4] = (float)(age / 365.0);
     }
 }
