@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace AFIE.FeatureEngineering.Models;
 
 public class FeatureEngineeringOptions
@@ -15,5 +17,6 @@ public class FeatureEngineeringOptions
 
     public string PublisherMode { get; set; } = "postgres";
     public string PostgresConnectionString { get; set; } = "";
+    [Range(1, int.MaxValue, ErrorMessage = "EmitIntervalSeconds must be greater than zero.")]
     public int EmitIntervalSeconds { get; set; } = 60;
 }
