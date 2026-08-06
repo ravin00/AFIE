@@ -25,12 +25,6 @@ public sealed class StateVectorEmitterService : BackgroundService
         _publisher = publisher;
         _options = options.Value;
         _logger = logger;
-
-        if (_options.EmitIntervalSeconds <= 0)
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                _options.EmitIntervalSeconds,
-                $"{nameof(FeatureEngineeringOptions.EmitIntervalSeconds)} must be greater than zero.");
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
