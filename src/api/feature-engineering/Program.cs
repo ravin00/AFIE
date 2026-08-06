@@ -45,10 +45,20 @@ builder.Services.AddSingleton<IFeatureGroup, ActionHistoryFeatures>();
 builder.Services.AddSingleton<StateVectorBuilder>();
 
 var publisherMode = section["PublisherMode"] ?? "postgres";
-if (publisherMode == "azureml")
-    builder.Services.AddSingleton<IStateVectorPublisher, AzureMlFeatureStorePublisher>();
-else
-    builder.Services.AddSingleton<IStateVectorPublisher, PostgresStateWriter>();
+switch (publisherMode)
+{
+    case "postgres":
+        builder.Services.AddSingleton<IStateVectorPublisher, PostgresStateWriter>();
+        break;
+    case "azureml":
+        throw new InvalidOperationException(
+            "FeatureEngineering:PublisherMode=azureml is not yet implemented. " +
+            "Set PublisherMode=postgres until AzureMlFeatureStorePublisher is completed (Phase 8).");
+    default:
+        throw new InvalidOperationException(
+            $"FeatureEngineering:PublisherMode='{publisherMode}' is not supported. " +
+            "Supported values: 'postgres'.");
+}
 
 var consumerMode = section["ConsumerMode"] ?? "local";
 if (consumerMode == "eventhub")
