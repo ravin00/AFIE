@@ -8,7 +8,12 @@ public record StateVector(
 )
 {
     public const int Dimensions = 47;
-    public float[] Values { get; init; } = ValidateValues(Values);
+    private readonly float[] _values = ValidateValues(Values);
+    public float [] Values
+    {
+        get => _values;
+        init => _values = ValidateValues(value);
+    }
 
     private static float[] ValidateValues(float[] values)
     {
