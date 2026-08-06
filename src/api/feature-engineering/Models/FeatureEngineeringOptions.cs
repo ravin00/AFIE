@@ -8,4 +8,8 @@ public class FeatureEngineeringOptions
     public string InputPath { get; set; } = "experiments/results";
     public string OffsetStatePath { get; set; } = "experiments/state/fe_consumer_offset.json";
     public int PollingIntervalMs { get; set; } = 500;
+
+    public double ConfiguredBudgetUsdPerHour {get;set;} = 10.0;
+    public double CpuCostPerCoreHourUsd {get;set;} = 0.031;
+    public double MemCostPerGiBHourUsd {get;set;} = 0.004;
 }
