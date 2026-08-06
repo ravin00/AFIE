@@ -65,6 +65,19 @@ public class StateVectorBuilderTests
             }));
     }
 
+    [Fact]
+    public void Ctor_NullValues_Throws()
+    => Assert.Throws<ArgumentNullException>(() =>
+        new StateVector("w", "ns", DateTimeOffset.UtcNow, null!));
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(46)]
+    [InlineData(48)]
+    public void Ctor_WrongLength_Throws(int len)
+        => Assert.Throws<ArgumentException>(() =>
+            new StateVector("w", "ns", DateTimeOffset.UtcNow, new float[len]));
+
     private sealed class BadGroup : IFeatureGroup
     {
         public int StartDim { get; }
