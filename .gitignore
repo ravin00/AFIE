@@ -239,3 +239,7 @@ override.tf
 override.tf.json
 *_override.tf
 *_override.tf.json
+# Agent skills (personal setup)
+.agents/
+.claude/skills/
+skills-lock.json
