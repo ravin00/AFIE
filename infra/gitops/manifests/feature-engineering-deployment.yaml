@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: afie-feature-engineering
+  namespace: afie-system
+  labels:
+    app: afie-feature-engineering
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: afie-feature-engineering
+  template:
+    metadata:
+      labels:
+        app: afie-feature-engineering
+    spec:
+      containers:
+        - name: feature-engineering
+          image: afie-feature-engineering:dev
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          env:
+            - name: FeatureEngineering__PublisherMode
+              value: "postgres"
+            - name: FeatureEngineering__ConsumerMode
+              value: "local"
+            - name: FeatureEngineering__InputPath
+              value: "/app/experiments/results"
+            - name: FeatureEngineering__OffsetStatePath
+              value: "/app/experiments/state/fe_consumer_offset.json"
+            - name: FeatureEngineering__PostgresConnectionString
+              valueFrom:
+                secretKeyRef:
+                  name: feature-engineering-secrets
+                  key: postgres-connection-string
+          # Startup uses PostgresStateWriter.EnsureReadyAsync — the pod fails
+          # to become Ready until Postgres is reachable and the schema is
+          # applied. Give it up to 60s (12 * 5s) before the kubelet restarts.
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            failureThreshold: 12
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          volumeMounts:
+            - name: feature-engineering-data
+              mountPath: /app/experiments
+      volumes:
+        - name: feature-engineering-data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: afie-feature-engineering
+  namespace: afie-system
+spec:
+  selector:
+    app: afie-feature-engineering
+  ports:
+    - port: 8080
+      targetPort: 8080
+  type: ClusterIP
