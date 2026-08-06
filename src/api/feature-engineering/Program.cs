@@ -1,4 +1,6 @@
 using AFIE.FeatureEngineering.Consumers;
+using AFIE.FeatureEngineering.Endpoints;
+using AFIE.FeatureEngineering.Features;
 using AFIE.FeatureEngineering.Health;
 using AFIE.FeatureEngineering.Models;
 using AFIE.FeatureEngineering.Services;
@@ -13,6 +15,16 @@ builder.Services.Configure<EventHubOptions>(builder.Configuration.GetSection("Ev
 builder.Services.AddSingleton<FeatureEngineeringHealthState>();
 builder.Services.AddSingleton<ActionHistoryStore>();
 builder.Services.AddSingleton<WindowStore>();
+
+builder.Services.AddSingleton<IFeatureGroup, CpuFeatures>();
+builder.Services.AddSingleton<IFeatureGroup, MemoryFeatures>();
+builder.Services.AddSingleton<IFeatureGroup, AppSignalFeatures>();
+builder.Services.AddSingleton<IFeatureGroup, NodePressureFeatures>();
+builder.Services.AddSingleton<IFeatureGroup, CostFeatures>();
+builder.Services.AddSingleton<IFeatureGroup, TemporalFeatures>();
+builder.Services.AddSingleton<IFeatureGroup, DeploymentFeatures>();
+builder.Services.AddSingleton<IFeatureGroup, ActionHistoryFeatures>();
+builder.Services.AddSingleton<StateVectorBuilder>();
 
 var consumerMode = section["ConsumerMode"] ?? "local";
 if (consumerMode == "eventhub")
@@ -29,5 +41,8 @@ app.MapHealthChecks("/health", new HealthCheckOptions
 {
     ResponseWriter = FeatureEngineeringHealthCheck.WriteResponse
 });
+app.MapStateEndpoints();
 
 app.Run();
+
+public partial class Program;
