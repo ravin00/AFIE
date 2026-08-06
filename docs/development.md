@@ -40,6 +40,36 @@ kubectl -n monitoring get pods             # kube-prometheus-stack running
 kubectl -n argocd get pods                 # argocd running
 ```
 
+### Local Postgres for Feature Engineering
+
+The feature-engineering service persists state vectors to PostgreSQL.
+Run Postgres locally:
+
+```bash
+docker run --rm -d --name afie-pg-dev \
+  -e POSTGRES_DB=afie -e POSTGRES_USER=afie -e POSTGRES_PASSWORD=afie \
+  -p 5432:5432 postgres:16-alpine
+```
+
+Set the connection string via User Secrets — the value never lives in
+the repo:
+
+```bash
+dotnet user-secrets init --project src/api/feature-engineering
+dotnet user-secrets set "FeatureEngineering:PostgresConnectionString" \
+  "Host=localhost;Port=5432;Database=afie;Username=afie;Password=afie" \
+  --project src/api/feature-engineering
+```
+
+The service throws at startup with a clear error if this isn't set. In
+production, the connection string comes from a Kubernetes `Secret` via
+the `FeatureEngineering__PostgresConnectionString` environment variable
+(see PR 6 manifests).
+
+The Postgres integration tests use Testcontainers and spin up their own
+ephemeral `postgres:16-alpine` per test class — no separate setup is
+needed for `dotnet test`, but Docker must be running.
+
 ## 3. Repository conventions
 
 - **Branches.** `feat/phaseN-<slug>` for phase work,
