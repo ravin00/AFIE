@@ -76,6 +76,13 @@ MigrationBackup/
 *.jfm
 appsettings.Development.json
 
+# .NET user secrets and local overrides
+secrets.json
+**/secrets.json
+appsettings.Local.json
+appsettings.*.Local.json
+local.settings.json
+
 # Python
 __pycache__/
 *.py[cod]
@@ -200,3 +207,39 @@ Desktop.ini
 # IDE
 .idea/
 *.iml
+
+# Credentials that must never land in the repo
+*.pem
+*.key
+*.pfx
+*.p12
+*.jks
+kubeconfig
+.kube/
+gcp-*.json
+azure-credentials.json
+credentials.json
+service-account*.json
+
+# AFIE runtime artifacts
+experiments/state/
+experiments/results/*.jsonl
+experiments/state_vectors.db
+experiments/state_vectors.db-*
+**/experiments/state/
+**/experiments/results/*.jsonl
+
+# Terraform (Phase 8+)
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+# Agent skills (personal setup)
+.agents/
+.claude/skills/
+skills-lock.json
