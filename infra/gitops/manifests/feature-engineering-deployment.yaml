@@ -5,8 +5,12 @@ metadata:
   namespace: afie-system
   labels:
     app: afie-feature-engineering
+    app.kubernetes.io/part-of: afie
+    afie.dev/purpose: state-vector-builder
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: afie-feature-engineering
@@ -14,48 +18,53 @@ spec:
     metadata:
       labels:
         app: afie-feature-engineering
+        app.kubernetes.io/part-of: afie
+        afie.dev/purpose: state-vector-builder
     spec:
+      initContainers:
+        - name: wait-for-postgres
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z afie-postgres 5432; do
+                echo "waiting for postgres..."
+                sleep 2
+              done
       containers:
         - name: feature-engineering
           image: afie-feature-engineering:dev
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
+              name: http
           env:
-            - name: FeatureEngineering__PublisherMode
-              value: "postgres"
             - name: FeatureEngineering__ConsumerMode
               value: "local"
+            - name: FeatureEngineering__PublisherMode
+              value: "postgres"
             - name: FeatureEngineering__InputPath
-              value: "/app/experiments/results"
+              value: "/app/data"
             - name: FeatureEngineering__OffsetStatePath
               value: "/app/experiments/state/fe_consumer_offset.json"
             - name: FeatureEngineering__PostgresConnectionString
               valueFrom:
                 secretKeyRef:
-                  name: feature-engineering-secrets
-                  key: postgres-connection-string
-          # Startup uses PostgresStateWriter.EnsureReadyAsync — the pod fails
-          # to become Ready until Postgres is reachable and the schema is
-          # applied. Give it up to 60s (12 * 5s) before the kubelet restarts.
-          startupProbe:
-            httpGet:
-              path: /health
-              port: 8080
-            failureThreshold: 12
-            periodSeconds: 5
-          livenessProbe:
-            httpGet:
-              path: /health/live
-              port: 8080
-            initialDelaySeconds: 30
-            periodSeconds: 30
+                  name: afie-postgres
+                  key: CONNECTION_STRING
           readinessProbe:
             httpGet:
               path: /health
               port: 8080
             initialDelaySeconds: 5
             periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 30
           resources:
             requests:
               cpu: 100m
@@ -64,10 +73,17 @@ spec:
               cpu: 500m
               memory: 512Mi
           volumeMounts:
-            - name: feature-engineering-data
-              mountPath: /app/experiments
+            - name: telemetry-in
+              mountPath: /app/data
+              readOnly: true
+            - name: fe-state
+              mountPath: /app/experiments/state
       volumes:
-        - name: feature-engineering-data
+        - name: telemetry-in
+          persistentVolumeClaim:
+            claimName: afie-telemetry-data
+            readOnly: true
+        - name: fe-state
           emptyDir: {}
 ---
 apiVersion: v1
@@ -75,10 +91,15 @@ kind: Service
 metadata:
   name: afie-feature-engineering
   namespace: afie-system
+  labels:
+    app: afie-feature-engineering
+    app.kubernetes.io/part-of: afie
+    afie.dev/purpose: state-vector-builder
 spec:
+  type: ClusterIP
   selector:
     app: afie-feature-engineering
   ports:
-    - port: 8080
+    - name: http
+      port: 8080
       targetPort: 8080
-  type: ClusterIP
