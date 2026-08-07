@@ -76,12 +76,12 @@ public class PostgresStateWriterTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task PublishAsync_ConnectionFailure_MarksUnreachable()
+    public async Task PublishAsync_ConnectionFailure_ThrowsAndMarksUnreachable()
     {
         await _pg.StopAsync();
         try
         {
-            await _writer.PublishAsync(SampleVector());
+            await Assert.ThrowsAnyAsync<Exception>(() => _writer.PublishAsync(SampleVector()));
             Assert.False(_health.PostgresReachable);
         }
         finally
