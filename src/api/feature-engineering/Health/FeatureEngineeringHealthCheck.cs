@@ -44,8 +44,9 @@ public sealed class FeatureEngineeringHealthCheck : IHealthCheck
         var stale = DateTimeOffset.UtcNow - _state.LastEventConsumedTime.Value;
         var threshold = TimeSpan.FromSeconds(TelemetryScrapeIntervalSeconds * StalenessMultiplier);
 
-        if (stale > threshold || !_state.SourceFileReachable)
-            return Task.FromResult(HealthCheckResult.Degraded("Consumer stale or source unreachable", data: data));
+        if (stale > threshold || !_state.SourceFileReachable || !_state.PostgresReachable)
+            return Task.FromResult(HealthCheckResult.Degraded(
+                "Consumer stale, source unreachable, or Postgres unreachable", data: data));
 
         return Task.FromResult(HealthCheckResult.Healthy("OK", data));
     }
