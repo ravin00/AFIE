@@ -73,10 +73,15 @@ public sealed class PostgresStateWriter : IStateVectorPublisher
             _health.StateVectorsWrittenTotal++;
             _health.PostgresReachable = true;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             _health.PostgresReachable = false;
             _logger.LogError(ex, "Postgres insert failed for {Workload}", vector.WorkloadName);
+            throw;
         }
     }
 }
