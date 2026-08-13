@@ -55,13 +55,13 @@ spec:
                   key: CONNECTION_STRING
           readinessProbe:
             httpGet:
-              path: /health
+              path: /readiness
               port: 8080
             initialDelaySeconds: 5
             periodSeconds: 10
           livenessProbe:
             httpGet:
-              path: /health
+              path: /health/live
               port: 8080
             initialDelaySeconds: 15
             periodSeconds: 30
