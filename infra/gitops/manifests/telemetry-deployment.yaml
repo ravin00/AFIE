@@ -52,6 +52,7 @@ spec:
         - name: telemetry-data
           persistentVolumeClaim:
             claimName: afie-telemetry-data
+---
 apiVersion: v1
 kind: Service
 metadata:
