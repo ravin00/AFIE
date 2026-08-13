@@ -82,6 +82,10 @@ app.MapHealthChecks("/health/live", new HealthCheckOptions
 {
     Predicate = _ => false
 });
+app.MapHealthChecks("/readiness", new HealthCheckOptions
+{
+    ResponseWriter = FeatureEngineeringHealthCheck.WriteResponse
+});
 app.MapStateEndpoints();
 
 await app.Services.GetRequiredService<IStateVectorPublisher>()
