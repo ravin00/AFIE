@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: afie-fe-state
+  namespace: afie-system
+  labels:
+    app.kubernetes.io/part-of: afie
+    afie.dev/purpose: fe-state
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
