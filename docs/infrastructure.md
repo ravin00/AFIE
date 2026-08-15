@@ -27,7 +27,7 @@ Defined in [`infra/gitops/namespaces.yaml`](../infra/gitops/namespaces.yaml):
 | Namespace | Contents |
 | --- | --- |
 | `monitoring` | kube-prometheus-stack (Prometheus, Alertmanager, Grafana) |
-| `afie-system` | AFIE control-plane pods — telemetry, feature engineering, operator, BFF |
+| `afie-system` | AFIE control-plane pods — telemetry, feature-engineering, `afie-postgres` StatefulSet, operator (Phase 6), BFF (Phase 7) |
 | `argocd` | Argo CD server + controllers |
 | `baseline-manual` | Baseline workload — human-tuned resource requests (Phase 9 experiment) |
 | `baseline-vpa` | Baseline — Vertical Pod Autoscaler managing requests |
@@ -85,9 +85,17 @@ Admin password retrieval is in [doc.md](doc.md).
 infra/gitops/
   namespaces.yaml           Cluster namespaces
   crds/                     Phase 6 — ResourceRecommendation CRD (scaffold)
-  manifests/                Plain rendered manifests — the operator writes here
+  manifests/                Plain rendered manifests — the operator (Phase 6) writes here
     telemetry-deployment.yaml
     nginx-test.yaml
+    afie-telemetry-data-pvc.yaml          # shared PVC (telemetry RW, FE RO)
+    afie-fe-state-pvc.yaml                # FE consumer offset
+    postgres-service.yaml
+    postgres-statefulset.yaml             # afie-postgres, 5Gi PVC template
+    feature-engineering-deployment.yaml   # requires afie-postgres Secret
+    feature-engineering-secret.example    # template only — see
+                                          # feature-engineering-service.md §4.4
+                                          # for the authoritative bootstrap
   monitoring/               kube-prometheus-stack Helm values
   argocd/                   ArgoCD Application + NodePort service
 ```
@@ -123,3 +131,24 @@ The Phase 8 provisioning surface is: Event Hub namespace + hub, Cosmos DB
 Static Web Apps for the dashboard. AKS is deliberately absent — the
 student subscription blocks it, and every experiment runs against the
 same manifests on KIND. See [roadmap.md](roadmap.md).
+
+## 9. Secrets
+
+Phase 4's feature-engineering service reads its Postgres connection
+string from a Kubernetes `Secret`. There is no committed secret file —
+the bootstrap is a single command run once per cluster:
+
+```bash
+PG_PASSWORD="$(openssl rand -hex 12)"
+kubectl -n afie-system create secret generic afie-postgres \
+  --from-literal=POSTGRES_DB=afie \
+  --from-literal=POSTGRES_USER=afie \
+  --from-literal=POSTGRES_PASSWORD="$PG_PASSWORD" \
+  --from-literal=CONNECTION_STRING="Host=afie-postgres;Port=5432;Database=afie;Username=afie;Password=$PG_PASSWORD"
+```
+
+The same `Secret` supplies `POSTGRES_*` to the StatefulSet via `envFrom`
+and `CONNECTION_STRING` to the FE deployment via `secretKeyRef` — one
+command, one rotation surface. See
+[feature-engineering-service.md §4.4](feature-engineering-service.md#44-secret-bootstrap)
+for rotation and the Phase 8 Azure Key Vault CSI plan.
