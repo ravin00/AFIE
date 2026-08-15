@@ -243,3 +243,6 @@ override.tf.json
 .agents/
 .claude/skills/
 skills-lock.json
+
+# Graphify output
+graphify-out/
