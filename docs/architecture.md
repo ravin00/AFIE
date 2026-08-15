@@ -23,7 +23,7 @@ flowchart LR
         end
         subgraph AfieNS["ns: afie-system"]
             Tel["Telemetry Service (C#) — BUILT"]
-            Feat["Feature Engineering (C#) — planned"]
+            Feat["Feature Engineering (C#) — BUILT"]
             Op["AFIE Operator (C#) — planned"]
             BFF["BFF API (C#) — planned"]
         end
@@ -36,8 +36,8 @@ flowchart LR
     Prom -->|scrape| Workloads
     Tel -->|PromQL every 15s| Prom
     Tel -->|MetricEvent JSONL| Sink[(experiments/results/*.jsonl)]
-    Feat -->|consume events| Sink
-    Feat -->|47-dim state vectors| SQLite[(experiments/state_vectors.db)]
+    Feat -->|tail JSONL| Sink
+    Feat -->|47-dim vectors, BYTEA| PG[(afie-postgres:<br/>state_vectors)]
 
     RL["RL Agent (Python/Flask) — planned"]
     Op -->|POST /predict| RL
@@ -47,7 +47,7 @@ flowchart LR
     ArgoCD -->|apply| Workloads
 
     Dash["Dashboard (React) — planned"]
-    BFF -->|read| SQLite
+    BFF -->|read| PG
     BFF -->|read| Prom
     Dash -->|HTTP| BFF
 ```
@@ -61,7 +61,7 @@ runtime behaviour.
 | # | Component | Language / stack | Phase | Status | Purpose |
 | - | --- | --- | --- | --- | --- |
 | 1 | Telemetry Service | ASP.NET Core 8 | 3 | Built | Scrape Prometheus every 15s, publish `MetricEvent`s |
-| 2 | Feature Engineering | ASP.NET Core 8 + MathNet | 4 | Planned | Convert `MetricEvent`s into the 47-dim state vector |
+| 2 | Feature Engineering | ASP.NET Core 8 + MathNet + Npgsql | 4 | Built | 47-dim state vector via `/state/{workload}`; 60s emitter persists to Postgres |
 | 3 | RL Agent | Python 3.11, Stable-Baselines3, SHAP, Flask | 5 | Planned | PPO policy; serves `POST /predict`; SHAP explanations |
 | 4 | AFIE Operator | .NET 8 + KubeOps + Octokit | 6 | Planned | Reconcile `ResourceRecommendation` CRDs, run PCL, open PRs |
 | 5 | BFF API | ASP.NET Core 8 | 7 | Planned | Aggregate SQLite audit log + Prometheus for the UI |
@@ -127,6 +127,14 @@ Cyclic encoding on temporal dims is load-bearing: hour 23 must be adjacent
 to hour 0 in feature space. All values are clamped to `[-2, 2]` and NaN/Inf
 are coerced to zero.
 
+> **Note on CPU/Memory dims (0–8, 9–17).** Each 9-slot group is
+> `{P50, P95, P99} × {5m, 15m, 1h}` of `usage / limit` —
+> `CpuUsageRate / max(CpuLimit, ε)` for CPU and
+> `MemoryBytes / max(MemLimit, ε)` for memory. `CpuRequest`, `CpuLimit`,
+> `MemRequest`, `MemLimit` from `MetricEvent` are used as normalisation
+> denominators, not as standalone dimensions. This is what makes the
+> 47-total arithmetic add up (9 + 9 + 6 + 3 + 3 + 5 + 3 + 9 = 47).
+
 ## 6. Action space and reward
 
 - **Action space:** `Discrete(25)`. `levels = [-20, -10, 0, +10, +20]` percent.
@@ -164,8 +172,12 @@ Never run Argo CD and Flux against the same path in the same cluster.
 ## 9. Deployment topology
 
 **Development (Phases 1–7, current):** everything runs on a single KIND
-cluster on the developer's MacBook. Cost: $0. Publishers write to local
-files / SQLite; the RL agent runs as a local Flask process on
+cluster on the developer's MacBook. Cost: $0. Telemetry writes JSONL to a
+shared `ReadWriteOnce` PVC in `afie-system`; feature engineering mounts
+the same PVC read-only and consumes the files. Persisted state vectors
+land in a single-replica `afie-postgres` StatefulSet with a 5Gi PVC. Both
+service pods must co-locate on the same node (RWO PVC constraint),
+enforced by pod affinity. The RL agent runs as a local Flask process on
 `localhost:5001`; the dashboard runs on Vite dev server at
 `localhost:5173`.
 
