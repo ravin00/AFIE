@@ -4,7 +4,7 @@ Phases 1–3 are complete. Phases 4–9 are the remaining scope from
 `AFIE_Workflow_updated.docx`. This doc summarises each phase, its
 dependencies, and the acceptance criteria used to call it "done".
 
-## Phase 4 — Feature Engineering Service (weeks 8–10)
+## Phase 4 — Feature Engineering Service (weeks 8–10) ✅ Complete
 
 **Goal.** Turn a stream of `MetricEvent`s into the 47-dim state vector
 consumed by the RL agent, the operator, and the dashboard.
@@ -20,16 +20,25 @@ consumed by the RL agent, the operator, and the dashboard.
   [architecture.md §5](architecture.md#5-the-47-dimensional-state-vector)).
 - `StateVectorBuilder` asserting length 47, clamping NaN / out-of-range
   to safe values.
-- Persistence: `LocalStateWriter` → SQLite at
-  `experiments/state_vectors.db`; Azure ML Feature Store writer coded
-  but disabled.
+- Persistence: `PostgresStateWriter` → 188-byte `BYTEA` blob in
+  `state_vectors` table on a single-replica `afie-postgres`
+  StatefulSet in `afie-system` (dev cluster). Dapper +
+  `NpgsqlDataSource` pooling. `AzureMlFeatureStorePublisher` coded as
+  a stub, disabled until Phase 8.
+- Kubernetes deployment: shared `afie-telemetry-data` PVC feeds JSONL
+  from telemetry → FE; separate `afie-fe-state` PVC holds the tailer
+  offset. Init container gates FE on `pg_isready`. `Recreate` strategy
+  for single-writer safety.
 - HTTP: `GET /state/{workloadName}` returns the current `float[47]`.
 - Tests per feature group with known input → known output; boundary
   cases on the temporal encoding are load-bearing (hour 0 == hour 24).
 
 **Depends on.** Phase 3 output format (`MetricEvent`).
-**Done when.** Service running in `afie-system`, `/state/{workload}`
-returns 47 values all in `[-1, 1]`, and all 8 feature-group tests pass.
+**Done when.** ✅ Service running in `afie-system`; ✅
+`/state/{workload}` returns 47 values all in `[-1, 1]`; ✅ all
+feature-group tests pass; ✅ end-to-end verified on KIND: telemetry pod
+→ shared PVC → FE tailer → `WindowStore` → 60s emitter → Postgres
+`state_vectors`.
 
 ## Phase 5 — Reinforcement Learning Agent (weeks 11–15)
 
