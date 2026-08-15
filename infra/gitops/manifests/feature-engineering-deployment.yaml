@@ -104,7 +104,8 @@ spec:
             claimName: afie-telemetry-data
             readOnly: true
         - name: fe-state
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: afie-fe-state
 ---
 apiVersion: v1
 kind: Service
