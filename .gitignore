@@ -246,3 +246,15 @@ skills-lock.json
 
 # Graphify output
 graphify-out/
+
+# Ignore build and dependency folders
+node_modules/
+dist/
+build/
+.git/
+
+# Ignore large auto-generated files except the graph
+*.log
+*.lock
+package-lock.json
+yarn.lock
