@@ -12,6 +12,10 @@ dev = [
     "pytest>=8.3",
 ]
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
 [tool.ruff]
 line-length = 100
 target-version = "py311"
@@ -23,6 +27,7 @@ select = ["E", "F", "I", "UP", "B"]
 python_version = "3.11"
 strict = true
 files = ["src/ml/afie_ml"]
+mypy_path = "src/ml"
 
 [build-system]
 requires = ["hatchling"]
@@ -30,3 +35,6 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/ml/afie_ml"]
+
+[tool.hatch.build]
+sources = ["src/ml"]
