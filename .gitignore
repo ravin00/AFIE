@@ -242,6 +242,7 @@ override.tf.json
 # Agent skills (personal setup)
 .agents/
 .claude/skills/
+.clauderc
 skills-lock.json
 
 # Graphify output
