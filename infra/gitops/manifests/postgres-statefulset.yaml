@@ -32,7 +32,7 @@ spec:
           securityContext:
             runAsNonRoot: false
             runAsUser: 0
-          command: ["sh", "-c", "mkdir -p /pgdata && chown 70:70 /pgdata && chmod 700 /pgdata"]
+                    command: ["sh", "-c", "mkdir -p /pgdata/pgdata && chown -R 70:70 /pgdata && chmod 700 /pgdata/pgdata"]
           volumeMounts:
             - name: data
               mountPath: /pgdata
