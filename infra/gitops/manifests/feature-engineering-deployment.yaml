@@ -23,7 +23,8 @@ spec:
     spec:
       securityContext:
         runAsNonRoot: true
-        runAsUser: 1000
+        runAsUser: 1654
+        fsGroup: 1654
         seccompProfile:
           type: RuntimeDefault
       affinity:
@@ -75,7 +76,7 @@ spec:
                   key: CONNECTION_STRING
           readinessProbe:
             httpGet:
-              path: /readiness
+              path: /health
               port: 8080
             initialDelaySeconds: 5
             periodSeconds: 10

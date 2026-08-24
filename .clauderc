@@ -1,5 +1,0 @@
-You are connected to a Graphify codebase map. 
-CRITICAL TOKEN SAVING RULES:
-1. NEVER use standard search, grep, or file-reading tools on whole files if you can find the structural answer in GRAPH_REPORT.md.
-2. If you must read a file, use specific line-range tools (snippets). NEVER read an entire file over 50 lines long.
-3. Always check the graph queries first to locate exact dependencies.
