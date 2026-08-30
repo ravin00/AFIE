@@ -24,12 +24,11 @@ if (string.IsNullOrWhiteSpace(postgresConnectionString))
         "For local dev, set it via User Secrets: " +
         "`dotnet user-secrets set \"FeatureEngineering:PostgresConnectionString\" \"...\" " +
         "--project src/api/feature-engineering`. " +
-        "For production, source it from a Kubernetes Secret via the " +
+        "For production, source it from a Kubernetes Secret via the rew" +
         "FeatureEngineering__PostgresConnectionString environment variable.");
 
 var dataSource = new NpgsqlDataSourceBuilder(postgresConnectionString).Build();
 builder.Services.AddSingleton(dataSource);
-
 builder.Services.AddSingleton<FeatureEngineeringHealthState>();
 builder.Services.AddSingleton<ActionHistoryStore>();
 builder.Services.AddSingleton<WindowStore>();
