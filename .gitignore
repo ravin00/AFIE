@@ -242,11 +242,13 @@ override.tf.json
 # Agent skills (personal setup)
 .agents/
 .claude/
+.opencode/
 .clauderc
 skills-lock.json
 scripts/graphify-mcp/
 CLAUDE.md
 claude.md
+AGENTS.md
 
 # Graphify output
 graphify-out/
