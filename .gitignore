@@ -244,6 +244,8 @@ override.tf.json
 .claude/
 .clauderc
 skills-lock.json
+CLAUDE.md
+claude.md
 
 # Graphify output
 graphify-out/
