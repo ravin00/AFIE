@@ -26,9 +26,10 @@ def compute_reward(
           - 10.0 * policy_violations``
 
     Args:
-        cost_delta: Normalised cost change (positive = saving).
+        cost_delta: Normalised cost change in ``[-1, 1]`` (positive = saving).
         slo_compliance: SLO compliance score in ``[0, 1]``.
-        carbon_delta: Normalised carbon-change signal (positive = lower).
+        carbon_delta: Normalised carbon-change signal in ``[-1, 1]``
+            (positive = lower).
         policy_violations: Count of PCL / safety-policy breaches this step.
 
     Returns:
@@ -36,6 +37,7 @@ def compute_reward(
 
     Raises:
         ValueError: If ``slo_compliance`` is outside ``[0, 1]``.
+        ValueError: If ``cost_delta`` or ``carbon_delta`` is outside ``[-1, 1]``.
         ValueError: If ``policy_violations`` is negative.
     """
     if policy_violations < 0:
@@ -46,6 +48,16 @@ def compute_reward(
     if not 0.0 <= slo_compliance <= 1.0:
         raise ValueError(
             f"slo_compliance must be in [0, 1], got {slo_compliance}"
+        )
+
+    if not -1.0 <= cost_delta <= 1.0:
+        raise ValueError(
+            f"cost_delta must be in [-1, 1], got {cost_delta}"
+        )
+
+    if not -1.0 <= carbon_delta <= 1.0:
+        raise ValueError(
+            f"carbon_delta must be in [-1, 1], got {carbon_delta}"
         )
 
     return (
