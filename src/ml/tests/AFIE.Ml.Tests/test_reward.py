@@ -90,6 +90,14 @@ def test_slo_boundaries_are_inclusive() -> None:
     assert compute_reward(0.0, 1.0, 0.0, 0) == pytest.approx(0.3)
 
 
+def test_max_valid_inputs_with_one_violation_stays_negative() -> None:
+    """Regression: the maximum permitted positive inputs plus a single policy
+    violation must never produce a positive reward."""
+    reward = compute_reward(1.0, 1.0, 1.0, 1)  # 0.9 - 10.0 = -9.1
+    assert reward < 0.0
+    assert reward == pytest.approx(-9.1)
+
+
 # ---------------------------------------------------------------------------
 # Validation
 # ---------------------------------------------------------------------------
@@ -113,3 +121,23 @@ def test_slo_below_zero_raises() -> None:
 def test_slo_above_one_raises() -> None:
     with pytest.raises(ValueError, match="in \\[0, 1\\]"):
         compute_reward(0.0, 1.1, 0.0, 0)
+
+
+def test_cost_delta_above_max_raises() -> None:
+    with pytest.raises(ValueError, match="in \\[-1, 1\\]"):
+        compute_reward(1.1, 0.0, 0.0, 0)
+
+
+def test_cost_delta_below_min_raises() -> None:
+    with pytest.raises(ValueError, match="in \\[-1, 1\\]"):
+        compute_reward(-1.1, 0.0, 0.0, 0)
+
+
+def test_carbon_delta_above_max_raises() -> None:
+    with pytest.raises(ValueError, match="in \\[-1, 1\\]"):
+        compute_reward(0.0, 0.0, 1.1, 0)
+
+
+def test_carbon_delta_below_min_raises() -> None:
+    with pytest.raises(ValueError, match="in \\[-1, 1\\]"):
+        compute_reward(0.0, 0.0, -1.1, 0)
