@@ -23,8 +23,7 @@ if (string.IsNullOrWhiteSpace(postgresConnectionString))
         "FeatureEngineering:PostgresConnectionString is not configured. " +
         "For local dev, set it via User Secrets: " +
         "`dotnet user-secrets set \"FeatureEngineering:PostgresConnectionString\" \"...\" " +
-        "--project src/api/feature-engineering`. " +
-        "For production, source it from a Kubernetes Secret via the rew" +
+        "--project src/api/feature-engineering`. "  +
         "FeatureEngineering__PostgresConnectionString environment variable.");
 
 var dataSource = new NpgsqlDataSourceBuilder(postgresConnectionString).Build();
