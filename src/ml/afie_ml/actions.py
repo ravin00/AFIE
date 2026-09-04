@@ -1,17 +1,3 @@
-"""Action decoding for the AFIE RL agent.
-
-The agent's action space is ``Discrete(25)`` — a flat 5x5 grid of CPU and
-memory adjustment levels. The centre action (12) is the no-op. This module
-is the single source of truth for turning an action integer into a concrete
-``(cpu_adjustment_pct, mem_adjustment_pct)`` pair; offline training, the live
-environment, and the Flask inference server all decode through it so the
-mapping can never drift between training and serving.
-
-Canonical spec — architecture.md section 6:
-    Discrete(25). levels = [-20, -10, 0, +10, +20] percent.
-    cpu_adj = levels[a // 5], mem_adj = levels[a % 5].
-"""
-
 from typing import Final
 
 ADJUSTMENT_LEVELS: Final[tuple[int, ...]] = (-20, -10, 0, 10, 20)
