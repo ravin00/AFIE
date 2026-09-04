@@ -20,20 +20,7 @@ def compute_reward(
     carbon_delta: float,
     policy_violations: int,
 ) -> float:
-    if policy_violations < 0:
-        raise ValueError(
-            f"policy_violations must be non-negative, got {policy_violations}"
-        )
-
-    return (
-        COST_WEIGHT * cost_delta
-        + SLO_WEIGHT * slo_compliance
-        + CARBON_WEIGHT * carbon_delta
-        - POLICY_VIOLATION_PENALTY * policy_violations
-    )
-
-
-"""Compute the single-step scalar reward for the RL agent.
+    """Compute the single-step scalar reward for the RL agent.
 
     ``R = 0.5 * cost_delta + 0.3 * slo_compliance + 0.1 * carbon_delta
           - 10.0 * policy_violations``
@@ -48,5 +35,22 @@ def compute_reward(
         The scalar reward as a ``float``.
 
     Raises:
+        ValueError: If ``slo_compliance`` is outside ``[0, 1]``.
         ValueError: If ``policy_violations`` is negative.
-"""
+    """
+    if policy_violations < 0:
+        raise ValueError(
+            f"policy_violations must be non-negative, got {policy_violations}"
+        )
+
+    if not 0.0 <= slo_compliance <= 1.0:
+        raise ValueError(
+            f"slo_compliance must be in [0, 1], got {slo_compliance}"
+        )
+
+    return (
+        COST_WEIGHT * cost_delta
+        + SLO_WEIGHT * slo_compliance
+        + CARBON_WEIGHT * carbon_delta
+        - POLICY_VIOLATION_PENALTY * policy_violations
+    )

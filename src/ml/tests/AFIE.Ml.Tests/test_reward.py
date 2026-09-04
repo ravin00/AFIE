@@ -84,6 +84,12 @@ def test_partial_inputs() -> None:
     assert compute_reward(0.0, 0.0, 0.6, 0) == pytest.approx(0.06)
 
 
+def test_slo_boundaries_are_inclusive() -> None:
+    # 0 and 1 are the documented inclusive boundaries and must remain valid.
+    assert compute_reward(0.0, 0.0, 0.0, 0) == pytest.approx(0.0)
+    assert compute_reward(0.0, 1.0, 0.0, 0) == pytest.approx(0.3)
+
+
 # ---------------------------------------------------------------------------
 # Validation
 # ---------------------------------------------------------------------------
@@ -97,3 +103,13 @@ def test_negative_violations_raises() -> None:
 def test_negative_violations_raises_large_negative() -> None:
     with pytest.raises(ValueError):
         compute_reward(0.0, 0.0, 0.0, -100)
+
+
+def test_slo_below_zero_raises() -> None:
+    with pytest.raises(ValueError, match="in \\[0, 1\\]"):
+        compute_reward(0.0, -0.1, 0.0, 0)
+
+
+def test_slo_above_one_raises() -> None:
+    with pytest.raises(ValueError, match="in \\[0, 1\\]"):
+        compute_reward(0.0, 1.1, 0.0, 0)
