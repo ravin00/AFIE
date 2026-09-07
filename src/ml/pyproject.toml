@@ -3,7 +3,12 @@ name = "afie-ml"
 version = "0.1.0"
 description = "AFIE reinforcement-learning agent — Phase 5"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "gymnasium>=0.29",
+    "numpy>=1.26",
+    "pandas>=2.2",
+    "pyarrow>=16",
+]
 
 [dependency-groups]
 dev = [
