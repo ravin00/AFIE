@@ -51,13 +51,13 @@ FEATURE_NAMES: Final[tuple[str, ...]] = (
     # 38-46 — Action history, most-recent-first
     "Last action: cost delta",
     "Last action: SLO delta",
-    "Last action: minutes since",
+    "Last action: hours since",
     "2nd-last action: cost delta",
     "2nd-last action: SLO delta",
-    "2nd-last action: minutes since",
+    "2nd-last action: hours since",
     "3rd-last action: cost delta",
     "3rd-last action: SLO delta",
-    "3rd-last action: minutes since",
+    "3rd-last action: hours since",
 )
 
 if len(FEATURE_NAMES) != STATE_VECTOR_DIM:
