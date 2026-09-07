@@ -26,7 +26,7 @@ def test_group_boundary_labels() -> None:
     assert FEATURE_NAMES[30] == "Hour of day (sin)"
     assert FEATURE_NAMES[35] == "Replica count (placeholder)"
     assert FEATURE_NAMES[38] == "Last action: cost delta"
-    assert FEATURE_NAMES[46] == "3rd-last action: minutes since"
+    assert FEATURE_NAMES[46] == "3rd-last action: hours since"
 
 
 def test_action_history_is_most_recent_first() -> None:
