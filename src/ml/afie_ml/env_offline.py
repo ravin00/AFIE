@@ -1,24 +1,3 @@
-"""Offline dataset-replay environment for safe PPO pre-training.
-
-`AFIEOfflineEnv` replays historical 47-dim observations from a parquet file
-(produced by the dataset-ingestion step) so the agent can learn a rough
-policy without ever touching a live cluster.
-
-Because this is *replay*, the next observation is simply the next dataset
-row -- it does not reflect the agent's action. The reward therefore comes
-from a right-sizing heuristic over (current observation, decoded action):
-
-  * reward shrinking over-provisioned resources (cost + carbon win),
-  * keep SLO compliance high by preserving headroom,
-  * flag a policy violation when the action would shrink a resource whose
-    post-action utilisation breaches the 10% headroom rule (the PCL rule-2
-    analogue) -- the -10 penalty in `compute_reward` then dominates.
-
-This heuristic is a documented training-time approximation. Online
-fine-tuning (Phase 6) replaces it with real cost/SLO deltas measured on the
-cluster.
-"""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -60,14 +39,17 @@ class AFIEOfflineEnv(gym.Env[npt.NDArray[np.float32], int]):
     def __init__(self, parquet_path: str | Path) -> None:
         super().__init__()
         frame = pd.read_parquet(parquet_path)
-        if frame.shape[1] != STATE_VECTOR_DIM:
-            raise ValueError(
-                f"expected {STATE_VECTOR_DIM} columns, got {frame.shape[1]}"
-            )
+        missing = [n for n in FEATURE_NAMES if n not in frame.columns]
+        if missing:
+            raise ValueError(f"parquet missing expected feature columns: {missing[:5]}...")
+        frame = frame.loc[:, list(FEATURE_NAMES)]
         if len(frame) == 0:
             raise ValueError("offline dataset is empty")
 
-        self._frame = frame
+        data = frame.to_numpy(dtype=np.float32)
+        if not np.isfinite(data).all():
+            raise ValueError("offline dataset contains non-finite values")
+        self._data: npt.NDArray[np.float32] = np.clip(data, -1.0, 1.0)
         self._cursor = 0
         self.observation_space = spaces.Box(
             low=-1.0, high=1.0, shape=(STATE_VECTOR_DIM,), dtype=np.float32
@@ -87,7 +69,7 @@ class AFIEOfflineEnv(gym.Env[npt.NDArray[np.float32], int]):
     def step(
         self, action: int
     ) -> tuple[npt.NDArray[np.float32], float, bool, bool, dict[str, Any]]:
-        if self._cursor >= len(self._frame):
+        if self._cursor >= len(self._data):
             raise RuntimeError("step() called after episode end; call reset() first")
 
         current = self._row(self._cursor)
@@ -95,16 +77,14 @@ class AFIEOfflineEnv(gym.Env[npt.NDArray[np.float32], int]):
         reward = self._reward(current, cpu_adj, mem_adj)
 
         self._cursor += 1
-        truncated = self._cursor >= len(self._frame)
+        truncated = self._cursor >= len(self._data)
         next_obs = current if truncated else self._row(self._cursor)
         info = {"cpu_adjustment_pct": cpu_adj, "mem_adjustment_pct": mem_adj}
         # Offline replay has no MDP-terminal state; end of data is a truncation.
         return next_obs, reward, False, truncated, info
 
     def _row(self, index: int) -> npt.NDArray[np.float32]:
-        values = self._frame.iloc[index].to_numpy(dtype=np.float32)
-        # cast: numpy/pandas lose the float32 dtype through mypy at this boundary.
-        return cast("npt.NDArray[np.float32]", np.clip(values, -1.0, 1.0))
+        return cast("npt.NDArray[np.float32]", self._data[index].copy())
 
     @staticmethod
     def _reward(obs: npt.NDArray[np.float32], cpu_adj: int, mem_adj: int) -> float:
