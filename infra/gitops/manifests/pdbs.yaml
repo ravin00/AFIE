@@ -1,0 +1,20 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: { name: afie-feature-engineering, namespace: afie-system }
+spec:
+  minAvailable: 1
+  selector: { matchLabels: { app: afie-feature-engineering } }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: { name: afie-telemetry, namespace: afie-system }
+spec:
+  minAvailable: 1
+  selector: { matchLabels: { app: afie-telemetry } }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: { name: afie-postgres, namespace: afie-system }
+spec:
+  minAvailable: 1
+  selector: { matchLabels: { app: afie-postgres } }
