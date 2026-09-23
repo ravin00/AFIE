@@ -1,0 +1,40 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: afie
+  namespace: argocd
+spec:
+  description: AFIE app manifests from this repo, scoped to afie-system.
+  sourceRepos:
+    - https://github.com/ravin00/AFIE.git
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: afie-system
+  clusterResourceWhitelist: []
+  namespaceResourceWhitelist:
+    - group: "*"
+      kind: "*"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: platform
+  namespace: argocd
+spec:
+  description: Third-party Helm charts (monitoring, cost) in the monitoring namespace.
+  sourceRepos:
+    - https://github.com/ravin00/AFIE.git
+    - https://prometheus-community.github.io/helm-charts
+    - https://opencost.github.io/opencost-helm-chart
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: monitoring
+    - server: https://kubernetes.default.svc
+      namespace: kube-system
+  clusterResourceWhitelist:
+    - group: "*"
+      kind: "*"
+  namespaceResourceWhitelist:
+    - group: "*"
+      kind: "*"

@@ -1,4 +1,3 @@
-# Default deny + minimal allows for afie-system.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata: { name: default-deny, namespace: afie-system }
@@ -41,10 +40,9 @@ spec:
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
-metadata: { name: fe-health-and-http, namespace: afie-system }
+metadata: { name: fe-http, namespace: afie-system }
 spec:
   podSelector: { matchLabels: { app: afie-feature-engineering } }
   policyTypes: [Ingress]
   ingress:
-    - from: []
-      ports: [{ port: 8080 }]
+    - ports: [{ port: 8080 }]
