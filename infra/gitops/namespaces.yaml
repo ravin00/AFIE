@@ -1,3 +1,6 @@
+# Missing `---` separators + `restricted` PSA would break postgres init (runAsUser:0).
+# Baseline enforce + restricted warn = real security floor without blocking existing workloads.
+---
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -5,8 +8,10 @@ metadata:
   labels:
     app.kubernetes.io/part-of: afie
     afie.dev/purpose: observability
-    pod-security.kubernetes.io/enforce: restricted
-    pod-security.kubernetes.io/warn: restricted
+    # node-exporter needs hostNetwork/hostPath/hostPort — baseline blocks that.
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/warn: baseline
+---
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -14,8 +19,9 @@ metadata:
   labels:
     app.kubernetes.io/part-of: afie
     afie.dev/purpose: platform
-    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce: baseline
     pod-security.kubernetes.io/warn: restricted
+---
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -24,6 +30,7 @@ metadata:
     app.kubernetes.io/part-of: afie
     afie.dev/purpose: baseline
     afie.dev/baseline: manual
+---
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -32,6 +39,7 @@ metadata:
     app.kubernetes.io/part-of: afie
     afie.dev/purpose: baseline
     afie.dev/baseline: vpa
+---
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -40,6 +48,7 @@ metadata:
     app.kubernetes.io/part-of: afie
     afie.dev/purpose: baseline
     afie.dev/baseline: threshold
+---
 apiVersion: v1
 kind: Namespace
 metadata:
