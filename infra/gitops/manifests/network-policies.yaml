@@ -37,12 +37,5 @@ spec:
   ingress:
     - from: [{ namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: monitoring } } }]
       ports: [{ port: 8080 }]
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata: { name: fe-http, namespace: afie-system }
-spec:
-  podSelector: { matchLabels: { app: afie-feature-engineering } }
-  policyTypes: [Ingress]
-  ingress:
-    - ports: [{ port: 8080 }]
+# fe-http removed: kubelet health probes bypass NetworkPolicy, and prometheus
+# scrape is covered by allow-prom-scrape. No other client needs pod IP:8080.
