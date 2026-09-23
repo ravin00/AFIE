@@ -3,11 +3,11 @@ import pandas as pd
 import pytest
 
 from afie_ml.env_offline import AFIEOfflineEnv
-from afie_ml.feature_names import STATE_VECTOR_DIM
+from afie_ml.feature_names import FEATURE_NAMES, STATE_VECTOR_DIM
 
 
 def _write_parquet(path, rows: list[list[float]]) -> str:
-    df = pd.DataFrame(rows, columns=[f"f{i}" for i in range(STATE_VECTOR_DIM)])
+    df = pd.DataFrame(rows, columns=list(FEATURE_NAMES))
     df.to_parquet(path)
     return str(path)
 
