@@ -1,0 +1,47 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  dotnet:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with: { dotnet-version: '8.0.x' }
+      - run: dotnet restore AFIE.slnx
+      - run: dotnet build AFIE.slnx --no-restore -c Release
+      - run: dotnet test AFIE.slnx --no-build -c Release --logger "trx;LogFileName=results.trx"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: dotnet-test-results, path: '**/results.trx' }
+
+  python:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: src/ml } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: pip install uv && uv sync --all-extras
+      - run: uv run ruff check .
+      - run: uv run mypy afie_ml
+      - run: uv run pytest -q
+
+  manifests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install kubeconform
+        run: |
+          curl -sL https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz \
+            | tar xz -C /usr/local/bin kubeconform
+      - name: Validate manifests
+        run: |
+          kubeconform -summary -ignore-missing-schemas \
+            -schema-location default \
+            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+            $(find infra/gitops -name '*.yaml' -type f)
