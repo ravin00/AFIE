@@ -8,11 +8,11 @@ using Xunit;
 
 namespace AFIE.FeatureEngineering.Tests.Endpoints;
 
-public class StateEndpointsTests : IClassFixture<WebApplicationFactory<Program>>
+public class StateEndpointsTests : IClassFixture<TestWebAppFactory>
 {
-    private readonly WebApplicationFactory<Program> _factory;
+    private readonly TestWebAppFactory _factory;
 
-    public StateEndpointsTests(WebApplicationFactory<Program> factory) => _factory = factory;
+    public StateEndpointsTests(TestWebAppFactory factory) => _factory = factory;
 
     [Fact]
     public async Task Get_UnknownWorkload_Returns404()
