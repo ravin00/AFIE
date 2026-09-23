@@ -9,15 +9,6 @@ spec:
       max:            { cpu: "2",  memory: 2Gi }
 ---
 apiVersion: v1
-kind: LimitRange
-metadata: { name: default, namespace: monitoring }
-spec:
-  limits:
-    - type: Container
-      default:        { cpu: 500m, memory: 512Mi }
-      defaultRequest: { cpu: 100m, memory: 128Mi }
----
-apiVersion: v1
 kind: ResourceQuota
 metadata: { name: default, namespace: afie-system }
 spec:
