@@ -14,7 +14,7 @@ metadata:
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
-  project: default
+  project: afie
   source:
     # Update repoURL/targetRevision if you fork or rename the repo.
     repoURL: https://github.com/ravin00/AFIE.git
