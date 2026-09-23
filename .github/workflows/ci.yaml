@@ -9,13 +9,13 @@ jobs:
   dotnet:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9  # v4
         with: { dotnet-version: '8.0.x' }
       - run: dotnet restore AFIE.slnx
       - run: dotnet build AFIE.slnx --no-restore -c Release
       - run: dotnet test AFIE.slnx --no-build -c Release --logger "trx;LogFileName=results.trx"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         if: always()
         with: { name: dotnet-test-results, path: '**/results.trx' }
 
@@ -23,8 +23,8 @@ jobs:
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: src/ml } }
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
         with: { python-version: '3.11' }
       - run: pip install uv && uv sync --all-extras
       - run: uv run ruff check .
@@ -33,15 +33,21 @@ jobs:
 
   manifests:
     runs-on: ubuntu-latest
+    env:
+      KUBECONFORM_VERSION: v0.8.0
     steps:
-      - uses: actions/checkout@v4
-      - name: Install kubeconform
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+      - name: Install kubeconform (pinned)
         run: |
-          curl -sL https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz \
+          curl -sL "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz" \
             | tar xz -C /usr/local/bin kubeconform
-      - name: Validate manifests
+          kubeconform -v
+      - name: Validate manifests (strict, CRD schemas required)
         run: |
-          kubeconform -summary -ignore-missing-schemas \
+          # Exclude helm values files — they aren't standalone k8s manifests.
+          FILES=$(find infra/gitops -name '*.yaml' -type f \
+            ! -path 'infra/gitops/monitoring/*')
+          kubeconform -strict -summary \
             -schema-location default \
             -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
-            $(find infra/gitops -name '*.yaml' -type f)
+            $FILES
