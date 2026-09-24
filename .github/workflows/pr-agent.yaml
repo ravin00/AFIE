@@ -27,7 +27,7 @@ jobs:
           GITHUB_ACTION_CONFIG.AUTO_REVIEW: "true"
           GITHUB_ACTION_CONFIG.AUTO_DESCRIBE: "true"
           GITHUB_ACTION_CONFIG.AUTO_IMPROVE: "false"  # noisy on WIP branches
-          CONFIG.MODEL: "openrouter/nvidia/nemotron-3-super:free"
+          CONFIG.MODEL: "openrouter/nvidia/nemotron-3-super-120b-a12b:free"
           CONFIG.FALLBACK_MODELS: '[]'
           CONFIG.CUSTOM_MODEL_MAX_TOKENS: "128000"
           # Trim noise paths from context.
