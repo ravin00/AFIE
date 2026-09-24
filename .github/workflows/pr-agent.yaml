@@ -27,10 +27,8 @@ jobs:
           GITHUB_ACTION_CONFIG.AUTO_REVIEW: "true"
           GITHUB_ACTION_CONFIG.AUTO_DESCRIBE: "true"
           GITHUB_ACTION_CONFIG.AUTO_IMPROVE: "false"  # noisy on WIP branches
-          # Cheap + solid default; swap for openrouter/anthropic/claude-sonnet-4-5
-          # if review quality falls short.
-          CONFIG.MODEL: "openrouter/google/gemini-2.5-flash"
-          CONFIG.FALLBACK_MODELS: '["openrouter/anthropic/claude-3.5-haiku"]'
-          CONFIG.CUSTOM_MODEL_MAX_TOKENS: "1000000"
+          CONFIG.MODEL: "openrouter/nvidia/nemotron-3-super:free"
+          CONFIG.FALLBACK_MODELS: '[]'
+          CONFIG.CUSTOM_MODEL_MAX_TOKENS: "128000"
           # Trim noise paths from context.
           IGNORE.GLOB: '["graphify-out/**", "**/node_modules/**", "**/.venv/**", "scripts/graphify-mcp/**"]'
