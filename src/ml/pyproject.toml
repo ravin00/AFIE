@@ -8,6 +8,7 @@ dependencies = [
     "numpy>=1.26",
     "pandas>=2.2",
     "pyarrow>=16",
+    "requests>=2.32",
 ]
 
 [dependency-groups]
@@ -16,6 +17,7 @@ dev = [
     "mypy>=1.11",
     "pytest>=8.3",
     "pandas-stubs>=2.2",
+    "pytest-httpserver>=1.1",
 ]
 
 [tool.pytest.ini_options]
