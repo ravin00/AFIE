@@ -6,7 +6,7 @@ without applying the action until then.
 
 from __future__ import annotations
 
-from typing import Any 
+from typing import Any
 
 import gymnasium as gym
 import numpy as np
