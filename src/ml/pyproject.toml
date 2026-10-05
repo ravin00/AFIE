@@ -42,6 +42,3 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["afie_ml"]
-
-[tool.hatch.build.targets.wheel.force-include]
-"afie_ml/py.typed" = "afie_ml/py.typed"
