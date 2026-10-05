@@ -41,11 +41,16 @@ class AFIEEnv(gym.Env[npt.NDArray[np.float32], int]):
     def _fetch_state(self) -> npt.NDArray[np.float32]:
         resp = requests.get(self._url, timeout=self._timeout)
         resp.raise_for_status()
-        values = np.asarray(resp.json(), dtype=np.float32)
+        try:
+            values = np.asarray(resp.json(), dtype=np.float32)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"non-numeric payload from {self._url}") from exc
         if values.shape != (STATE_VECTOR_DIM,):
             raise ValueError(
                 f"expected {STATE_VECTOR_DIM} values from {self._url}, got {values.shape}"
             )
+        if not np.isfinite(values).all():
+            raise ValueError(f"non-finite values from {self._url}")
         return np.clip(values, -1.0, 1.0)
 
     def reset(
