@@ -2,8 +2,11 @@ import pytest
 
 from afie_ml.reward import (
     CARBON_WEIGHT,
+    CLOUD_SAVINGS_WEIGHT,
     COST_WEIGHT,
+    EGRESS_PENALTY_WEIGHT,
     POLICY_VIOLATION_PENALTY,
+    REGION_SAVINGS_WEIGHT,
     SLO_WEIGHT,
     compute_reward,
 )
@@ -13,19 +16,13 @@ from afie_ml.reward import (
 # ---------------------------------------------------------------------------
 
 
-def test_cost_weight() -> None:
-    assert COST_WEIGHT == pytest.approx(0.5)
-
-
-def test_slo_weight() -> None:
-    assert SLO_WEIGHT == pytest.approx(0.3)
-
-
-def test_carbon_weight() -> None:
-    assert CARBON_WEIGHT == pytest.approx(0.1)
-
-
-def test_violation_penalty() -> None:
+def test_weights() -> None:
+    assert COST_WEIGHT == pytest.approx(0.30)
+    assert CLOUD_SAVINGS_WEIGHT == pytest.approx(0.20)
+    assert REGION_SAVINGS_WEIGHT == pytest.approx(0.10)
+    assert SLO_WEIGHT == pytest.approx(0.20)
+    assert CARBON_WEIGHT == pytest.approx(0.08)
+    assert EGRESS_PENALTY_WEIGHT == pytest.approx(0.05)
     assert POLICY_VIOLATION_PENALTY == pytest.approx(10.0)
 
 
@@ -34,68 +31,77 @@ def test_violation_penalty() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_all_positive_inputs() -> None:
-    assert compute_reward(1.0, 1.0, 1.0, 0) == pytest.approx(0.9)
+def test_all_zero_inputs() -> None:
+    assert compute_reward(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0) == pytest.approx(0.0)
 
 
-def test_zero_inputs() -> None:
-    assert compute_reward(0.0, 0.0, 0.0, 0) == pytest.approx(0.0)
+def test_all_positive_inputs_no_egress() -> None:
+    # 0.30 + 0.20 + 0.10 + 0.20 + 0.08 = 0.88
+    assert compute_reward(1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0) == pytest.approx(0.88)
 
 
-def test_single_violation() -> None:
-    assert compute_reward(1.0, 1.0, 1.0, 1) == pytest.approx(-9.1)
+def test_max_savings_with_max_egress() -> None:
+    # 0.88 - 0.05 = 0.83
+    assert compute_reward(1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0) == pytest.approx(0.83)
+
+
+def test_single_violation_dominates_everything() -> None:
+    # 0.83 - 10.0 = -9.17
+    assert compute_reward(1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1) == pytest.approx(-9.17)
 
 
 def test_two_violations() -> None:
-    assert compute_reward(1.0, 1.0, 1.0, 2) == pytest.approx(-19.1)
+    assert compute_reward(1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 2) == pytest.approx(-19.17)
 
 
 # ---------------------------------------------------------------------------
-# Dominance property — one violation always outweighs every positive term
+# Dominance invariant
 # ---------------------------------------------------------------------------
 
 
 def test_one_violation_outweighs_max_positive_reward() -> None:
-    """A single violation (-10.0) must dominate the best possible positive
-    reward from the other three terms combined (0.5 + 0.3 + 0.1 = 0.9)."""
     max_positive = (
-        COST_WEIGHT * 1.0 + SLO_WEIGHT * 1.0 + CARBON_WEIGHT * 1.0
+        COST_WEIGHT * 1.0
+        + CLOUD_SAVINGS_WEIGHT * 1.0
+        + REGION_SAVINGS_WEIGHT * 1.0
+        + SLO_WEIGHT * 1.0
+        + CARBON_WEIGHT * 1.0
     )
-    reward_with_one_violation = compute_reward(1.0, 1.0, 1.0, 1)
-    assert reward_with_one_violation < -max_positive
+    reward = compute_reward(1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 1)
+    assert reward < -max_positive
 
 
 # ---------------------------------------------------------------------------
-# Edge cases
+# Term isolation
 # ---------------------------------------------------------------------------
+
+
+def test_cost_only() -> None:
+    assert compute_reward(1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0) == pytest.approx(0.30)
+
+
+def test_cloud_savings_only() -> None:
+    assert compute_reward(0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0) == pytest.approx(0.20)
+
+
+def test_region_savings_only() -> None:
+    assert compute_reward(0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0) == pytest.approx(0.10)
+
+
+def test_slo_only() -> None:
+    assert compute_reward(0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0) == pytest.approx(0.20)
+
+
+def test_carbon_only() -> None:
+    assert compute_reward(0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0) == pytest.approx(0.08)
+
+
+def test_egress_penalty_subtracted() -> None:
+    assert compute_reward(0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0) == pytest.approx(-0.05)
 
 
 def test_negative_cost_delta() -> None:
-    assert compute_reward(-1.0, 0.0, 0.0, 0) == pytest.approx(-0.5)
-
-
-def test_negative_carbon_delta() -> None:
-    assert compute_reward(0.0, 0.0, -1.0, 0) == pytest.approx(-0.1)
-
-
-def test_partial_inputs() -> None:
-    assert compute_reward(0.5, 0.0, 0.0, 0) == pytest.approx(0.25)
-    assert compute_reward(0.0, 0.8, 0.0, 0) == pytest.approx(0.24)
-    assert compute_reward(0.0, 0.0, 0.6, 0) == pytest.approx(0.06)
-
-
-def test_slo_boundaries_are_inclusive() -> None:
-    # 0 and 1 are the documented inclusive boundaries and must remain valid.
-    assert compute_reward(0.0, 0.0, 0.0, 0) == pytest.approx(0.0)
-    assert compute_reward(0.0, 1.0, 0.0, 0) == pytest.approx(0.3)
-
-
-def test_max_valid_inputs_with_one_violation_stays_negative() -> None:
-    """Regression: the maximum permitted positive inputs plus a single policy
-    violation must never produce a positive reward."""
-    reward = compute_reward(1.0, 1.0, 1.0, 1)  # 0.9 - 10.0 = -9.1
-    assert reward < 0.0
-    assert reward == pytest.approx(-9.1)
+    assert compute_reward(-1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0) == pytest.approx(-0.30)
 
 
 # ---------------------------------------------------------------------------
@@ -105,39 +111,40 @@ def test_max_valid_inputs_with_one_violation_stays_negative() -> None:
 
 def test_negative_violations_raises() -> None:
     with pytest.raises(ValueError, match="non-negative"):
-        compute_reward(0.0, 0.0, 0.0, -1)
+        compute_reward(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1)
 
 
-def test_negative_violations_raises_large_negative() -> None:
-    with pytest.raises(ValueError):
-        compute_reward(0.0, 0.0, 0.0, -100)
-
-
-def test_slo_below_zero_raises() -> None:
+def test_slo_out_of_range_raises() -> None:
     with pytest.raises(ValueError, match="in \\[0, 1\\]"):
-        compute_reward(0.0, -0.1, 0.0, 0)
-
-
-def test_slo_above_one_raises() -> None:
+        compute_reward(0.0, 0.0, 0.0, -0.1, 0.0, 0.0, 0)
     with pytest.raises(ValueError, match="in \\[0, 1\\]"):
-        compute_reward(0.0, 1.1, 0.0, 0)
+        compute_reward(0.0, 0.0, 0.0, 1.1, 0.0, 0.0, 0)
 
 
-def test_cost_delta_above_max_raises() -> None:
+def test_cost_delta_out_of_range_raises() -> None:
     with pytest.raises(ValueError, match="in \\[-1, 1\\]"):
-        compute_reward(1.1, 0.0, 0.0, 0)
-
-
-def test_cost_delta_below_min_raises() -> None:
+        compute_reward(1.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0)
     with pytest.raises(ValueError, match="in \\[-1, 1\\]"):
-        compute_reward(-1.1, 0.0, 0.0, 0)
+        compute_reward(-1.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0)
 
 
-def test_carbon_delta_above_max_raises() -> None:
-    with pytest.raises(ValueError, match="in \\[-1, 1\\]"):
-        compute_reward(0.0, 0.0, 1.1, 0)
+def test_cloud_savings_out_of_range_raises() -> None:
+    with pytest.raises(ValueError, match="cloud_savings"):
+        compute_reward(0.0, -0.1, 0.0, 0.0, 0.0, 0.0, 0)
+    with pytest.raises(ValueError, match="cloud_savings"):
+        compute_reward(0.0, 1.1, 0.0, 0.0, 0.0, 0.0, 0)
 
 
-def test_carbon_delta_below_min_raises() -> None:
-    with pytest.raises(ValueError, match="in \\[-1, 1\\]"):
-        compute_reward(0.0, 0.0, -1.1, 0)
+def test_region_savings_out_of_range_raises() -> None:
+    with pytest.raises(ValueError, match="region_savings"):
+        compute_reward(0.0, 0.0, -0.1, 0.0, 0.0, 0.0, 0)
+
+
+def test_egress_cost_out_of_range_raises() -> None:
+    with pytest.raises(ValueError, match="egress_cost"):
+        compute_reward(0.0, 0.0, 0.0, 0.0, 0.0, 1.1, 0)
+
+
+def test_carbon_delta_out_of_range_raises() -> None:
+    with pytest.raises(ValueError, match="carbon_delta"):
+        compute_reward(0.0, 0.0, 0.0, 0.0, 1.1, 0.0, 0)
