@@ -3,8 +3,11 @@ import pytest
 import requests
 from pytest_httpserver import HTTPServer
 
+from afie_ml.actions import ACTION_SPACE_NVEC
 from afie_ml.env_live import AFIEEnv
 from afie_ml.feature_names import STATE_VECTOR_DIM
+
+NOOP = np.array([2, 2, 0, 0, 0, 0, 0], dtype=np.int64)
 
 
 def _serve(httpserver: HTTPServer, workload: str, vec: list[float]) -> AFIEEnv:
@@ -15,7 +18,7 @@ def _serve(httpserver: HTTPServer, workload: str, vec: list[float]) -> AFIEEnv:
 def test_spaces(httpserver: HTTPServer) -> None:
     env = _serve(httpserver, "nginx", [0.1] * STATE_VECTOR_DIM)
     assert env.observation_space.shape == (STATE_VECTOR_DIM,)
-    assert env.action_space.n == 25
+    assert tuple(env.action_space.nvec.tolist()) == ACTION_SPACE_NVEC
 
 
 def test_reset_fetches_state(httpserver: HTTPServer) -> None:
@@ -29,11 +32,12 @@ def test_reset_fetches_state(httpserver: HTTPServer) -> None:
 def test_step_returns_gymnasium_5_tuple(httpserver: HTTPServer) -> None:
     env = _serve(httpserver, "nginx", [0.1] * STATE_VECTOR_DIM)
     env.reset()
-    obs, reward, terminated, truncated, info = env.step(12)
+    obs, reward, terminated, truncated, info = env.step(NOOP)
     assert obs.shape == (STATE_VECTOR_DIM,)
     assert isinstance(reward, float)
     assert terminated is False and truncated is False
     assert info["cpu_adjustment_pct"] == 0
+    assert info["region_action"] == 0
 
 
 def test_live_vector_clipped_to_unit_range(httpserver: HTTPServer) -> None:
