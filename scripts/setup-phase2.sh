@@ -21,7 +21,7 @@ set -euo pipefail
 CLUSTER_NAME="afie-dev"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 GITOPS="${REPO_ROOT}/infra/gitops"
-ARGOCD_VERSION="stable"
+ARGOCD_VERSION="v2.13.2"   # pin; was "stable" (a moving target)
 
 echo "==> [1/6] KIND cluster"
 if kind get clusters | grep -qx "${CLUSTER_NAME}"; then
