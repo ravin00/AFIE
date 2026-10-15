@@ -5,6 +5,10 @@ metadata:
   namespace: afie-system
   labels:
     app: afie-telemetry
+    app.kubernetes.io/name: afie-telemetry
+    app.kubernetes.io/part-of: afie
+    app.kubernetes.io/component: telemetry-collector
+    afie.dev/purpose: metric-collector
 spec:
   replicas: 1
   selector:
@@ -62,6 +66,7 @@ spec:
   selector:
     app: afie-telemetry
   ports:
-    - port: 8080
+    - name: http
+      port: 8080
       targetPort: 8080
   type: ClusterIP
