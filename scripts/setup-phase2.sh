@@ -56,6 +56,18 @@ kubectl -n argocd rollout restart deployment argocd-server
 kubectl -n argocd rollout status deployment argocd-server --timeout=120s
 kubectl apply -f "${GITOPS}/argocd/argocd-server-nodeport.yaml"
 
+echo "==> [4b] Sealed Secrets controller"
+helm repo add sealed-secrets https://bitnami-labs.github.io/sealed-secrets >/dev/null 2>&1 || true
+helm repo update >/dev/null
+helm upgrade --install sealed-secrets sealed-secrets/sealed-secrets \
+  --namespace sealed-secrets --create-namespace \
+  --version 2.16.1 \
+  --wait --timeout 5m
+# The committed SealedSecret only decrypts under the key that sealed it. On a
+# fresh cluster you MUST re-seal before ArgoCD syncs afie-postgres.sealed.yaml:
+#   POSTGRES_USER=... POSTGRES_PASSWORD=... POSTGRES_DB=... \
+#     scripts/seal-postgres-secret.sh
+
 echo "==> [5/6] Wire GitOps (ArgoCD Application) + deploy test workload"
 kubectl apply -f "${GITOPS}/argocd/app-afie.yaml"
 # Also apply the smoke-test directly so it's up even before the first ArgoCD sync.
