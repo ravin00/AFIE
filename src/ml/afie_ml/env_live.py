@@ -14,12 +14,12 @@ import numpy.typing as npt
 import requests
 from gymnasium import spaces
 
-from afie_ml.actions import ACTION_SPACE_SIZE, decode_action
+from afie_ml.actions import ACTION_SPACE_NVEC, decode_action
 from afie_ml.feature_names import STATE_VECTOR_DIM
 from afie_ml.heuristic import right_sizing_reward
 
 
-class AFIEEnv(gym.Env[npt.NDArray[np.float32], int]):
+class AFIEEnv(gym.Env[npt.NDArray[np.float32], npt.NDArray[np.int64]]):
     """Gymnasium env backed by the live feature-engineering /state endpoint."""
 
     metadata: dict[str, Any] = {"render_modes": []}
@@ -36,7 +36,7 @@ class AFIEEnv(gym.Env[npt.NDArray[np.float32], int]):
         self.observation_space = spaces.Box(
             low=-1.0, high=1.0, shape=(STATE_VECTOR_DIM,), dtype=np.float32
         )
-        self.action_space = spaces.Discrete(ACTION_SPACE_SIZE)
+        self.action_space = spaces.MultiDiscrete(np.array(ACTION_SPACE_NVEC))  # type: ignore[assignment]
 
     def _fetch_state(self) -> npt.NDArray[np.float32]:
         resp = requests.get(self._url, timeout=self._timeout)
@@ -63,11 +63,19 @@ class AFIEEnv(gym.Env[npt.NDArray[np.float32], int]):
         return self._fetch_state(), {}
 
     def step(
-        self, action: int
+        self, action: npt.NDArray[np.int64]
     ) -> tuple[npt.NDArray[np.float32], float, bool, bool, dict[str, Any]]:
-        cpu_adj, mem_adj = decode_action(int(action))
+        decoded = decode_action(action)
         current = self._fetch_state()
-        reward = right_sizing_reward(current, cpu_adj, mem_adj)
+        reward = right_sizing_reward(current, decoded)
         next_obs = self._fetch_state()
-        info = {"cpu_adjustment_pct": cpu_adj, "mem_adjustment_pct": mem_adj}
+        info = {
+            "cpu_adjustment_pct": decoded.cpu_adj_pct,
+            "mem_adjustment_pct": decoded.mem_adj_pct,
+            "instance_lifecycle": decoded.instance_lifecycle,
+            "commitment_plan": decoded.commitment_plan,
+            "storage_tier": decoded.storage_tier,
+            "scheduling": decoded.scheduling,
+            "region_action": decoded.region_action,
+        }
         return next_obs, reward, False, False, info

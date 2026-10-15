@@ -1,8 +1,8 @@
 from afie_ml.feature_names import FEATURE_NAMES, STATE_VECTOR_DIM
 
 
-def test_exactly_47_names() -> None:
-    assert len(FEATURE_NAMES) == STATE_VECTOR_DIM == 47
+def test_exactly_55_names() -> None:
+    assert len(FEATURE_NAMES) == STATE_VECTOR_DIM == 55
 
 
 def test_all_names_non_empty() -> None:
@@ -15,7 +15,7 @@ def test_no_duplicate_names() -> None:
 
 def test_group_boundary_labels() -> None:
     # Spot-check the first index of each feature group so a reordering
-    # within the 47 is caught, not just a length drift.
+    # within the 55 is caught, not just a length drift.
     assert FEATURE_NAMES[0] == "CPU util P50 (5m)"
     assert FEATURE_NAMES[8] == "CPU util P99 (1h)"
     assert FEATURE_NAMES[9] == "Memory util P50 (5m)"
@@ -27,6 +27,10 @@ def test_group_boundary_labels() -> None:
     assert FEATURE_NAMES[35] == "Replica count (placeholder)"
     assert FEATURE_NAMES[38] == "Last action: cost delta"
     assert FEATURE_NAMES[46] == "3rd-last action: hours since"
+    assert FEATURE_NAMES[47] == "Spot price ratio"
+    assert FEATURE_NAMES[52] == "Workload is stateful"
+    assert FEATURE_NAMES[53] == "Cheaper region price index"
+    assert FEATURE_NAMES[54] == "Cross-region P99 baseline (ms, normalised)"
 
 
 def test_action_history_is_most_recent_first() -> None:
@@ -34,4 +38,3 @@ def test_action_history_is_most_recent_first() -> None:
     assert FEATURE_NAMES[38].startswith("Last action")
     assert FEATURE_NAMES[41].startswith("2nd-last action")
     assert FEATURE_NAMES[44].startswith("3rd-last action")
-    

@@ -1,11 +1,3 @@
-# ArgoCD Application — wires the GitOps controller to AFIE's manifests.
-# This is what makes "GitOps controller reconciling infra/gitops/manifests"
-# reproducible: apply this and ArgoCD continuously syncs the manifests path.
-#
-# The manifests under infra/gitops/manifests are plain, controller-agnostic
-# Kubernetes YAML, so a Flux Kustomization can target the same path later
-# (per the pluggable Argo/Flux backend design). Run only one controller
-# against the path at a time.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -15,10 +7,10 @@ metadata:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: afie
+  revisionHistoryLimit: 10
   source:
-    # Update repoURL/targetRevision if you fork or rename the repo.
     repoURL: https://github.com/ravin00/AFIE.git
-    targetRevision: main
+    targetRevision: main          # pin to a release tag for prod (see #8)
     path: infra/gitops/manifests
     directory:
       recurse: true
@@ -31,3 +23,11 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=false
+      - PrunePropagationPolicy=foreground
+      - ApplyOutOfSyncOnly=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
