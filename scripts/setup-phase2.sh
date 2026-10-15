@@ -6,9 +6,9 @@
 # Running this on a clean machine gives you the exact Phase 2 deliverables:
 #   - KIND cluster "afie-dev" (1 node Ready)
 #   - 6 project namespaces
-#   - kube-prometheus-stack (Prometheus + Grafana + Alertmanager) on NodePorts
-#   - ArgoCD installed and reconciling infra/gitops/manifests
-#   - nginx smoke-test workload
+#   - ArgoCD installed and reconciling everything via GitOps:
+#     kube-prometheus-stack (Prometheus/Grafana/Alertmanager) + OpenCost +
+#     the afie app manifests + nginx smoke-test workload
 #
 # Endpoints (via scripts/kind-config.yaml host port mappings):
 #   Grafana     http://localhost:3000   (admin / prom-operator)
@@ -35,15 +35,7 @@ kubectl get nodes
 echo "==> [2/6] Namespaces"
 kubectl apply -f "${GITOPS}/namespaces.yaml"
 
-echo "==> [3/6] Prometheus + Grafana (kube-prometheus-stack via Helm)"
-helm repo add prometheus-community https://prometheus-community.github.io/helm-charts >/dev/null 2>&1 || true
-helm repo update >/dev/null
-helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
-  --namespace monitoring \
-  -f "${GITOPS}/monitoring/kube-prometheus-stack.values.yaml" \
-  --wait --timeout 10m
-
-echo "==> [4/6] ArgoCD"
+echo "==> [3/6] ArgoCD"
 kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
 kubectl apply -n argocd \
   -f "https://raw.githubusercontent.com/argoproj/argo-cd/${ARGOCD_VERSION}/manifests/install.yaml"
@@ -56,7 +48,7 @@ kubectl -n argocd rollout restart deployment argocd-server
 kubectl -n argocd rollout status deployment argocd-server --timeout=120s
 kubectl apply -f "${GITOPS}/argocd/argocd-server-nodeport.yaml"
 
-echo "==> [4b] Sealed Secrets controller"
+echo "==> [4/6] Sealed Secrets controller"
 helm repo add sealed-secrets https://bitnami-labs.github.io/sealed-secrets >/dev/null 2>&1 || true
 helm repo update >/dev/null
 helm upgrade --install sealed-secrets sealed-secrets/sealed-secrets \
@@ -68,9 +60,17 @@ helm upgrade --install sealed-secrets sealed-secrets/sealed-secrets \
 #   POSTGRES_USER=... POSTGRES_PASSWORD=... POSTGRES_DB=... \
 #     scripts/seal-postgres-secret.sh
 
-echo "==> [5/6] Wire GitOps (ArgoCD Application) + deploy test workload"
+echo "==> [5/6] GitOps: AppProjects + Applications (ArgoCD owns monitoring too)"
+kubectl apply -f "${GITOPS}/argocd/appprojects.yaml"
+# Monitoring first: it installs the Prometheus-Operator CRDs that the afie app's
+# ServiceMonitor depends on. Wait for it before syncing the afie app.
+kubectl apply -f "${GITOPS}/argocd/app-monitoring.yaml"
+kubectl apply -f "${GITOPS}/argocd/app-opencost.yaml"
+echo "    waiting for kube-prometheus-stack Application to be Healthy..."
+kubectl -n argocd wait --for=jsonpath='{.status.health.status}'=Healthy \
+  application/kube-prometheus-stack --timeout=10m
 kubectl apply -f "${GITOPS}/argocd/app-afie.yaml"
-# Also apply the smoke-test directly so it's up even before the first ArgoCD sync.
+# Apply the smoke-test directly for immediacy; ArgoCD adopts it on first sync.
 kubectl apply -f "${GITOPS}/manifests/nginx-test.yaml"
 
 echo "==> [6/6] Verify"
