@@ -30,7 +30,7 @@ jobs:
           # On push to an open PR: re-run review only (auto_* flags don't fire on synchronize)
           GITHUB_ACTION_CONFIG.PUSH_COMMANDS: '["/review"]'
           CONFIG.MODEL: "openrouter/nvidia/nemotron-3-super-120b-a12b:free"
-          CONFIG.FALLBACK_MODELS: '[]'
+          CONFIG.FALLBACK_MODELS: '["openrouter/google/gemini-2.0-flash-exp:free", "openrouter/meta-llama/llama-3.3-70b-instruct:free"]'
           CONFIG.CUSTOM_MODEL_MAX_TOKENS: "128000"
           # Trim noise paths from context.
           IGNORE.GLOB: '["graphify-out/**", "**/node_modules/**", "**/.venv/**", "scripts/graphify-mcp/**"]'
