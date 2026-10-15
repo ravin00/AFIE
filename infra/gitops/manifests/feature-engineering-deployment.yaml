@@ -55,6 +55,7 @@ spec:
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities:
               drop: ["ALL"]
           ports:
@@ -99,6 +100,8 @@ spec:
               readOnly: true
             - name: fe-state
               mountPath: /app/experiments/state
+            - name: tmp
+              mountPath: /tmp
       volumes:
         - name: telemetry-in
           persistentVolumeClaim:
@@ -107,6 +110,8 @@ spec:
         - name: fe-state
           persistentVolumeClaim:
             claimName: afie-fe-state
+        - name: tmp
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
