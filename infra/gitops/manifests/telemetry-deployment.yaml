@@ -19,12 +19,24 @@ spec:
       labels:
         app: afie-telemetry
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1654
+        fsGroup: 1654
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: telemetry
           image: afie-telemetry:dev
           imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
           ports:
             - containerPort: 8080
+              name: http
           env:
             - name: Telemetry__PrometheusUrl
               value: "http://kube-prometheus-stack-prometheus.monitoring.svc:9090"
@@ -52,10 +64,14 @@ spec:
           volumeMounts:
             - name: telemetry-data
               mountPath: /app/data
+            - name: tmp
+              mountPath: /tmp
       volumes:
         - name: telemetry-data
           persistentVolumeClaim:
             claimName: afie-telemetry-data
+        - name: tmp
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
