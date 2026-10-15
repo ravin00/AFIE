@@ -1,0 +1,39 @@
+name: images
+
+on:
+  pull_request:
+    paths:
+      - "src/api/**"
+      - "src/shared/**"
+      - ".github/workflows/images.yml"
+  push:
+    branches: [main]
+    paths:
+      - "src/api/**"
+      - "src/shared/**"
+
+jobs:
+  build-scan:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        svc: [telemetry, feature-engineering]
+    env:
+      TRIVY_VERSION: v0.76.0
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+      # Both Dockerfiles use the repo root as build context (they COPY
+      # src/shared/AFIE.Contracts alongside the service), so build from ".".
+      - name: Build image
+        run: docker build -t afie-${{ matrix.svc }}:ci -f src/api/${{ matrix.svc }}/Dockerfile .
+      - name: Install Trivy (pinned)
+        run: |
+          curl -fsSL "https://github.com/aquasecurity/trivy/releases/download/${TRIVY_VERSION}/trivy_${TRIVY_VERSION#v}_Linux-64bit.tar.gz" \
+            | sudo tar xz -C /usr/local/bin trivy
+          trivy --version
+      - name: Scan image (fail on fixable CRITICAL/HIGH)
+        run: |
+          trivy image --scanners vuln \
+            --severity CRITICAL,HIGH --ignore-unfixed --exit-code 1 \
+            afie-${{ matrix.svc }}:ci

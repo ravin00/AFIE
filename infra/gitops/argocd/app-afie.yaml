@@ -1,3 +1,10 @@
+# ArgoCD Application — wires the GitOps controller to AFIE's manifests.
+#
+# The source is a Kustomize overlay (infra/gitops/overlays/dev) over the base
+# at infra/gitops/manifests. ArgoCD auto-detects Kustomize from the overlay's
+# kustomization.yaml. A Flux Kustomization can target the same path later
+# (per the pluggable Argo/Flux backend design). Run only one controller
+# against the path at a time.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -11,9 +18,7 @@ spec:
   source:
     repoURL: https://github.com/ravin00/AFIE.git
     targetRevision: main          # pin to a release tag for prod (see #8)
-    path: infra/gitops/manifests
-    directory:
-      recurse: true
+    path: infra/gitops/overlays/dev
   destination:
     server: https://kubernetes.default.svc
     namespace: afie-system

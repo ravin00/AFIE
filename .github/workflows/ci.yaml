@@ -35,19 +35,23 @@ jobs:
     runs-on: ubuntu-latest
     env:
       KUBECONFORM_VERSION: v0.8.0
+      KUSTOMIZE_VERSION: v5.6.0
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
-      - name: Install kubeconform (pinned)
+      - name: Install kubeconform + kustomize (pinned)
         run: |
           curl -sL "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz" \
             | tar xz -C /usr/local/bin kubeconform
-          kubeconform -v
+          curl -sL "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2F${KUSTOMIZE_VERSION}/kustomize_${KUSTOMIZE_VERSION}_linux_amd64.tar.gz" \
+            | tar xz -C /usr/local/bin kustomize
+          kubeconform -v && kustomize version
       - name: Validate manifests (strict, CRD schemas required)
         run: |
-          # Exclude helm values files — they aren't standalone k8s manifests.
-          FILES=$(find infra/gitops -name '*.yaml' -type f \
-            ! -path 'infra/gitops/monitoring/*')
+          # App manifests render through the kustomize overlay; the argocd/
+          # Applications and namespaces.yaml are standalone and validated raw.
+          # Helm values under monitoring/ are not k8s manifests — skip them.
+          kustomize build infra/gitops/overlays/dev > /tmp/rendered.yaml
           kubeconform -strict -summary \
             -schema-location default \
             -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
-            $FILES
+            /tmp/rendered.yaml $(find infra/gitops/argocd -name '*.yaml' -type f) infra/gitops/namespaces.yaml
