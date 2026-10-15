@@ -20,7 +20,7 @@ jobs:
       matrix:
         svc: [telemetry, feature-engineering]
     env:
-      TRIVY_VERSION: v0.58.1
+      TRIVY_VERSION: v0.76.0
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
       # Both Dockerfiles use the repo root as build context (they COPY
@@ -29,8 +29,8 @@ jobs:
         run: docker build -t afie-${{ matrix.svc }}:ci -f src/api/${{ matrix.svc }}/Dockerfile .
       - name: Install Trivy (pinned)
         run: |
-          curl -sL "https://github.com/aquasecurity/trivy/releases/download/${TRIVY_VERSION}/trivy_${TRIVY_VERSION#v}_Linux-64bit.tar.gz" \
-            | tar xz -C /usr/local/bin trivy
+          curl -fsSL "https://github.com/aquasecurity/trivy/releases/download/${TRIVY_VERSION}/trivy_${TRIVY_VERSION#v}_Linux-64bit.tar.gz" \
+            | sudo tar xz -C /usr/local/bin trivy
           trivy --version
       - name: Scan image (fail on fixable CRITICAL/HIGH)
         run: |
