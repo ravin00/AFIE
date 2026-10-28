@@ -2,7 +2,7 @@ namespace AFIE.Telemetry.Models;
 
 public class TelemetryOptions
 {
-    public string PrometheusUrl { get; set; } = "http://localhost:9090";
+    public string PrometheusUrl { get; set; } = "http://localhost:9090"; // remove the hardcoded urls.
     public int ScrapingIntervalSeconds { get; set; } = 15;
     public string OutputMode { get; set; } = "local";
     public string OutputPath { get; set; } = "experiments/results";

@@ -1,0 +1,17 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: afie-services
+  namespace: afie-system
+  labels:
+    release: kube-prometheus-stack   # the stack's default selector requires this
+spec:
+  namespaceSelector:
+    matchNames: [afie-system]
+  selector:
+    matchLabels:
+      app.kubernetes.io/part-of: afie
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
