@@ -9,7 +9,15 @@ dependencies = [
     "pandas>=2.2",
     "pyarrow>=16",
     "requests>=2.32",
+    "stable-baselines3>=2.3",
+    "torch>=2.2",
+    "tensorboard>=2.16",
+    "tqdm>=4.66",
+    "rich>=13",
 ]
+
+[project.scripts]
+afie-train-offline = "afie_ml.train_offline:main"
 
 [dependency-groups]
 dev = [
