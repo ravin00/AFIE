@@ -16,16 +16,16 @@ public class StateVectorBuilderTests
         {
             new CpuFeatures(), new MemoryFeatures(), new AppSignalFeatures(),
             new NodePressureFeatures(), new CostFeatures(), new TemporalFeatures(),
-            new DeploymentFeatures(), new ActionHistoryFeatures()
+            new DeploymentFeatures(), new ActionHistoryFeatures(), new CloudPricingFeatures()
         };
         return new StateVectorBuilder(groups, options, new ActionHistoryStore());
     }
 
     [Fact]
-    public void Build_ProducesExactly47Values()
+    public void Build_ProducesExactly55Values()
     {
         var vector = Build().Build("nginx", Array.Empty<MetricEvent>(), DateTimeOffset.UtcNow);
-        Assert.Equal(47, vector.Values.Length);
+        Assert.Equal(55, vector.Values.Length);
     }
 
     [Fact]
@@ -38,7 +38,7 @@ public class StateVectorBuilderTests
     [Fact]
     public void Build_ClampsAndCoercesNaNInf()
     {
-        var vector = Build(new IFeatureGroup[] { new BadGroup(0, 47) })
+        var vector = Build(new IFeatureGroup[] { new BadGroup(0, 55) })
             .Build("nginx", Array.Empty<MetricEvent>(), DateTimeOffset.UtcNow);
 
         Assert.Equal(0f, vector.Values[0]);   // NaN -> 0
@@ -48,7 +48,7 @@ public class StateVectorBuilderTests
     }
 
     [Fact]
-    public void Ctor_ThrowsWhenGroupsDoNotSumTo47()
+    public void Ctor_ThrowsWhenGroupsDoNotSumTo55()
     {
         Assert.Throws<InvalidOperationException>(() =>
             Build(new IFeatureGroup[] { new CpuFeatures() }));
@@ -61,7 +61,7 @@ public class StateVectorBuilderTests
             Build(new IFeatureGroup[]
             {
                 new CpuFeatures(),
-                new BadGroup(startDim: 20, length: 27)
+                new BadGroup(startDim: 20, length: 35)
             }));
     }
 
@@ -72,8 +72,8 @@ public class StateVectorBuilderTests
 
     [Theory]
     [InlineData(0)]
-    [InlineData(46)]
-    [InlineData(48)]
+    [InlineData(54)]
+    [InlineData(56)]
     public void Ctor_WrongLength_Throws(int len)
         => Assert.Throws<ArgumentException>(() =>
             new StateVector("w", "ns", DateTimeOffset.UtcNow, new float[len]));

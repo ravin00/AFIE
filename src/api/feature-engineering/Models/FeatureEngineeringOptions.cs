@@ -15,6 +15,9 @@ public class FeatureEngineeringOptions
     public double CpuCostPerCoreHourUsd { get; set; } = 0.031;
     public double MemCostPerGiBHourUsd { get; set; } = 0.004;
 
+    public CloudPricingProfile DefaultCloudPricing { get; set; } = new();
+    public Dictionary<string, CloudPricingProfile> CloudPricing { get; set; } = new();
+
     public string PublisherMode { get; set; } = "postgres";
     public string PostgresConnectionString { get; set; } = "";
     [Range(1, int.MaxValue, ErrorMessage = "EmitIntervalSeconds must be greater than zero.")]

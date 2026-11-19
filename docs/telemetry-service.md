@@ -9,7 +9,7 @@ Source: [`src/api/telemetry/`](../src/api/telemetry/) · Tests:
 
 ## 1. Responsibilities
 
-- Query Prometheus for the 13 PromQL expressions that feed the 47-dim state
+- Query Prometheus for the 13 PromQL expressions that feed the 55-dim state
   vector.
 - Join per-pod results across queries and emit one `MetricEvent` per pod.
 - Persist events reliably (append-only file today, partitioned Event Hub

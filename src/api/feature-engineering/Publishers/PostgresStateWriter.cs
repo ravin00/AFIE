@@ -14,9 +14,18 @@ public sealed class PostgresStateWriter : IStateVectorPublisher
           namespace  TEXT        NOT NULL,
           ts         TIMESTAMPTZ NOT NULL,
           vector     BYTEA       NOT NULL,
-          CHECK (octet_length(vector) = 188)
+          CONSTRAINT state_vectors_vector_check CHECK (octet_length(vector) = 220)
         );
         CREATE INDEX IF NOT EXISTS idx_sv_workload_ts ON state_vectors(workload, ts DESC);
+        -- 47→55 dims: swap the old 188-byte check; NOT VALID keeps historical 188-byte rows.
+        DO $$ BEGIN
+          IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'state_vectors_vector_check'
+                     AND pg_get_constraintdef(oid) NOT LIKE '%220%') THEN
+            ALTER TABLE state_vectors DROP CONSTRAINT state_vectors_vector_check;
+            ALTER TABLE state_vectors ADD CONSTRAINT state_vectors_vector_check
+              CHECK (octet_length(vector) = 220) NOT VALID;
+          END IF;
+        END $$;
     """;
 
     private const string InsertSql = """

@@ -37,7 +37,7 @@ flowchart LR
     Tel -->|PromQL every 15s| Prom
     Tel -->|MetricEvent JSONL| Sink[(experiments/results/*.jsonl)]
     Feat -->|tail JSONL| Sink
-    Feat -->|47-dim vectors, BYTEA| PG[(afie-postgres:<br/>state_vectors)]
+    Feat -->|55-dim vectors, BYTEA| PG[(afie-postgres:<br/>state_vectors)]
 
     RL["RL Agent (Python/Flask) — planned"]
     Op -->|POST /predict| RL
@@ -61,7 +61,7 @@ runtime behaviour.
 | # | Component | Language / stack | Phase | Status | Purpose |
 | - | --- | --- | --- | --- | --- |
 | 1 | Telemetry Service | ASP.NET Core 8 | 3 | Built | Scrape Prometheus every 15s, publish `MetricEvent`s |
-| 2 | Feature Engineering | ASP.NET Core 8 + MathNet + Npgsql | 4 | Built | 47-dim state vector via `/state/{workload}`; 60s emitter persists to Postgres |
+| 2 | Feature Engineering | ASP.NET Core 8 + MathNet + Npgsql | 4 | Built | 55-dim state vector via `/state/{workload}`; 60s emitter persists to Postgres |
 | 3 | RL Agent | Python 3.11, Stable-Baselines3, SHAP, Flask | 5 | Planned | PPO policy; serves `POST /predict`; SHAP explanations |
 | 4 | AFIE Operator | .NET 8 + KubeOps + Octokit | 6 | Planned | Reconcile `ResourceRecommendation` CRDs, run PCL, open PRs |
 | 5 | BFF API | ASP.NET Core 8 | 7 | Planned | Aggregate SQLite audit log + Prometheus for the UI |
@@ -87,9 +87,9 @@ sequenceDiagram
     W->>P: exposition every 15s
     T->>P: PromQL x13, Task.WhenAll
     T->>F: MetricEvent JSONL (or Event Hub in Phase 8)
-    F->>F: build 47-dim state vector<br/>(sliding 1h window)
+    F->>F: build 55-dim state vector<br/>(sliding 1h window)
     O->>F: GET /state/{workload}
-    O->>R: POST /predict [47]
+    O->>R: POST /predict [55]
     R-->>O: action 0..24, confidence, SHAP, explanation
     O->>O: PCL engine — 4 safety rules
     alt approved
@@ -105,9 +105,9 @@ sequenceDiagram
     end
 ```
 
-## 5. The 47-dimensional state vector
+## 5. The 55-dimensional state vector
 
-The RL agent's observation space is `Box(-1, 1, shape=(47,))`. Feature
+The RL agent's observation space is `Box(-1, 1, shape=(55,))`. Feature
 engineering is responsible for producing this vector exactly the same way
 in training (from the Azure Public Dataset 2020) and in production (from
 live `MetricEvent`s).
@@ -122,6 +122,8 @@ live `MetricEvent`s).
 | 30–34 | Temporal | sin/cos hour, sin/cos day-of-week, days-since-deploy |
 | 35–37 | Deployment | replica count, HPA target, rolling-update flag |
 | 38–46 | Action history | last 3 actions × (cost Δ, SLO Δ, minutes since) |
+| 47–52 | Cloud pricing | spot ratio, reservation coverage, storage access freq, region price index, commitment available, is-stateful |
+| 53–54 | Region migration | cheaper-region price index, cross-region P99 baseline |
 
 Cyclic encoding on temporal dims is load-bearing: hour 23 must be adjacent
 to hour 0 in feature space. All values are clamped to `[-2, 2]` and NaN/Inf
@@ -133,7 +135,7 @@ are coerced to zero.
 > `MemoryBytes / max(MemLimit, ε)` for memory. `CpuRequest`, `CpuLimit`,
 > `MemRequest`, `MemLimit` from `MetricEvent` are used as normalisation
 > denominators, not as standalone dimensions. This is what makes the
-> 47-total arithmetic add up (9 + 9 + 6 + 3 + 3 + 5 + 3 + 9 = 47).
+> 55-total arithmetic add up (9 + 9 + 6 + 3 + 3 + 5 + 3 + 9 + 8 = 55).
 
 ## 6. Action space and reward
 

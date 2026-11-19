@@ -40,6 +40,7 @@ builder.Services.AddSingleton<IFeatureGroup, CostFeatures>();
 builder.Services.AddSingleton<IFeatureGroup, TemporalFeatures>();
 builder.Services.AddSingleton<IFeatureGroup, DeploymentFeatures>();
 builder.Services.AddSingleton<IFeatureGroup, ActionHistoryFeatures>();
+builder.Services.AddSingleton<IFeatureGroup, CloudPricingFeatures>();
 builder.Services.AddSingleton<StateVectorBuilder>();
 
 var publisherMode = section["PublisherMode"] ?? "postgres";

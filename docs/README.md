@@ -15,7 +15,7 @@ live under `../paper/`; the phase-by-phase implementation workflow lives in
 | --- | --- |
 | [architecture.md](architecture.md) | System overview, components, data flow, tech stack |
 | [telemetry-service.md](telemetry-service.md) | Phase 3 service — Prometheus scraping, MetricEvent JSONL sink |
-| [feature-engineering-service.md](feature-engineering-service.md) | Phase 4 service — sliding window, 47-dim state vector, `/state` endpoint, Postgres persistence |
+| [feature-engineering-service.md](feature-engineering-service.md) | Phase 4 service — sliding window, 55-dim state vector, `/state` endpoint, Postgres persistence |
 | [infrastructure.md](infrastructure.md) | KIND cluster, Prometheus/Grafana, ArgoCD, Postgres |
 | [development.md](development.md) | Build, test, and run locally |
 | [roadmap.md](roadmap.md) | Planned scope for Phases 5–9 |
@@ -35,7 +35,7 @@ live under `../paper/`; the phase-by-phase implementation workflow lives in
 src/
   api/
     telemetry/           Phase 3 — ASP.NET Core scraper (built)
-    feature-engineering/ Phase 4 — 47-dim state vector + Postgres (built)
+    feature-engineering/ Phase 4 — 55-dim state vector + Postgres (built)
     bff/                 Phase 7 — scaffold only
   operator/              Phase 6 — scaffold only
   ml/                    Phase 5 — scaffold only
