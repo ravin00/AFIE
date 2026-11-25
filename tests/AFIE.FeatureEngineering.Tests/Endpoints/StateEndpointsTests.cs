@@ -23,7 +23,7 @@ public class StateEndpointsTests : IClassFixture<TestWebAppFactory>
     }
 
     [Fact]
-    public async Task Get_KnownWorkload_Returns47Values()
+    public async Task Get_KnownWorkload_Returns55Values()
     {
         var store = _factory.Services.GetRequiredService<WindowStore>();
         store.Add(new MetricEvent(
@@ -35,7 +35,7 @@ public class StateEndpointsTests : IClassFixture<TestWebAppFactory>
         var values = await client.GetFromJsonAsync<float[]>("/state/nginx-endpoint-test");
 
         Assert.NotNull(values);
-        Assert.Equal(47, values!.Length);
+        Assert.Equal(55, values!.Length);
         Assert.All(values, v => Assert.True(!float.IsNaN(v) && !float.IsInfinity(v)));
     }
 }

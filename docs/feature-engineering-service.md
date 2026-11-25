@@ -2,7 +2,7 @@
 
 ASP.NET Core 8 background worker that consumes `MetricEvent` records
 produced by the Phase 3 telemetry service, maintains a per-workload
-sliding window of samples, computes the 47-dimensional state vector the
+sliding window of samples, computes the 55-dimensional state vector the
 reinforcement-learning agent will consume, and persists a snapshot of
 every tracked workload to PostgreSQL every 60 seconds.
 
@@ -14,7 +14,7 @@ Source: [`src/api/feature-engineering/`](../src/api/feature-engineering/)
 - Tail today's `telemetry_{utc-date}.jsonl` file (dev) or consume from
   Azure Event Hub (Phase 8) and materialise `MetricEvent` records into an
   in-memory sliding window per workload.
-- Compute the 47-dim state vector on demand via
+- Compute the 55-dim state vector on demand via
   `GET /state/{workloadName}`, invariant-checked and clamped so the RL
   agent's observation space is deterministic.
 - Emit one persisted vector per tracked workload every 60 seconds to
@@ -32,7 +32,7 @@ recommendation issuance — those live in Phase 5 (RL agent) and Phase 6
 
 | Verb | Path | Purpose |
 | --- | --- | --- |
-| GET | `/state/{workloadName}` | Current 47-dim vector as a JSON array. `404 {error, workload}` if the workload is not tracked. |
+| GET | `/state/{workloadName}` | Current 55-dim vector as a JSON array. `404 {error, workload}` if the workload is not tracked. |
 | GET | `/state/{workloadName}/latest` | Same values plus `{timestamp}` for debugging. |
 | GET | `/health` | Composite: `feature-engineering` check + `postgres` (`AddNpgSql`) check. |
 | GET | `/readiness` | Same composite. Wired to the readiness probe. |
@@ -73,9 +73,9 @@ flowchart LR
     WS -->|Snapshot| SVB[StateVectorBuilder]
     FG[8× IFeatureGroup] -->|compose| SVB
     AH[ActionHistoryStore] -->|Recent| SVB
-    SVB -->|float[47]| API[/GET /state/{workload}/]
-    SVB -->|float[47]| EM[StateVectorEmitterService<br/>every 60s]
-    EM -->|BYTEA 188B| PG[(afie-postgres:<br/>state_vectors)]
+    SVB -->|float[55]| API[/GET /state/{workload}/]
+    SVB -->|float[55]| EM[StateVectorEmitterService<br/>every 60s]
+    EM -->|BYTEA 220B| PG[(afie-postgres:<br/>state_vectors)]
     HS[FeatureEngineeringHealthState] -.reads.-> HC[/GET /health/]
     C -.updates.-> HS
     EM -.updates.-> HS
@@ -119,8 +119,8 @@ public interface IFeatureGroup
 }
 ```
 
-Eight groups compose the 47-dim vector (see
-[architecture.md §5](architecture.md#5-the-47-dimensional-state-vector)
+Nine groups compose the 55-dim vector (see
+[architecture.md §5](architecture.md#5-the-55-dimensional-state-vector)
 for the full dimension table):
 
 | Class | Dims | Content |
@@ -133,9 +133,10 @@ for the full dimension table):
 | `TemporalFeatures` | 30–34 | sin/cos hour, sin/cos day-of-week, days-since-deploy |
 | `DeploymentFeatures` | 35–37 | replicas, HPA target, rolling flag (placeholders — Phase 6) |
 | `ActionHistoryFeatures` | 38–46 | last 3 × (cost Δ, SLO Δ, minutes since) |
+| `CloudPricingFeatures` | 47–54 | spot ratio, reservation coverage, storage access/h (`tanh`), region price index, commitment available, is-stateful, cheaper-region index, cross-region P99 (ms/1000). Static per-workload profiles from `FeatureEngineering:CloudPricing` (fallback `DefaultCloudPricing`) until live price APIs land |
 
 `StateVectorBuilder` composes them:
-- Ctor asserts the groups cover `[0, 47)` contiguously and sum to 47;
+- Ctor asserts the groups cover `[0, 55)` contiguously and sum to 55;
   throws `InvalidOperationException` otherwise.
 - `Build(workload, samples, now)` dispatches each group to its span
   slice, then clamps `[-2, 2]` and coerces `NaN` / `±Inf` to 0.
@@ -147,7 +148,7 @@ for the full dimension table):
 - **`PostgresStateWriter`** (default). Dapper + `NpgsqlDataSource`
   singleton. `EnsureReadyAsync` runs the DDL at boot; if Postgres is
   unreachable, the pod crashes with a clear error rather than serving a
-  broken loop. `PublishAsync` writes the 47 floats as a 188-byte `BYTEA`
+  broken loop. `PublishAsync` writes the 55 floats as a 220-byte `BYTEA`
   blob via `Buffer.BlockCopy` — little-endian float32, matching how the
   Phase 5 Python trainer will `np.frombuffer(row['vector'], dtype='<f4')`.
   Every call updates `FeatureEngineeringHealthState.PostgresReachable`
@@ -164,7 +165,7 @@ CREATE TABLE IF NOT EXISTS state_vectors (
   namespace  TEXT        NOT NULL,
   ts         TIMESTAMPTZ NOT NULL,
   vector     BYTEA       NOT NULL,
-  CHECK (octet_length(vector) = 188)
+  CHECK (octet_length(vector) = 220)
 );
 CREATE INDEX IF NOT EXISTS idx_sv_workload_ts ON state_vectors(workload, ts DESC);
 ```

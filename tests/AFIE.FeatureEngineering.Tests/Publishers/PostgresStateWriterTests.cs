@@ -39,8 +39,8 @@ public class PostgresStateWriterTests : IAsyncLifetime
 
     private static StateVector SampleVector(string workload = "nginx")
     {
-        var values = new float[47];
-        for (var i = 0; i < 47; i++) values[i] = i * 0.01f;
+        var values = new float[StateVector.Dimensions];
+        for (var i = 0; i < StateVector.Dimensions; i++) values[i] = i * 0.01f;
         return new StateVector(workload, "afie-system", DateTimeOffset.UtcNow, values);
     }
 
@@ -55,14 +55,35 @@ public class PostgresStateWriterTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task PublishAsync_RoundTrip_VectorIs188Bytes()
+    public async Task PublishAsync_RoundTrip_VectorIs220Bytes()
     {
         await _writer.PublishAsync(SampleVector());
 
         await using var conn = await _dataSource.OpenConnectionAsync();
         var len = await conn.ExecuteScalarAsync<int>(
             "SELECT octet_length(vector) FROM state_vectors ORDER BY id DESC LIMIT 1");
-        Assert.Equal(188, len);
+        Assert.Equal(220, len);
+    }
+
+    [Fact]
+    public async Task EnsureReadyAsync_Migrates47DimTable_KeepingOldRows()
+    {
+        await using var conn = await _dataSource.OpenConnectionAsync();
+        await conn.ExecuteAsync("""
+            DROP TABLE state_vectors;
+            CREATE TABLE state_vectors (
+              id BIGSERIAL PRIMARY KEY, workload TEXT NOT NULL, namespace TEXT NOT NULL,
+              ts TIMESTAMPTZ NOT NULL, vector BYTEA NOT NULL, CHECK (octet_length(vector) = 188));
+            INSERT INTO state_vectors(workload, namespace, ts, vector)
+              VALUES ('old', 'ns', now(), decode(repeat('00', 188), 'hex'));
+            """);
+
+        await _writer.EnsureReadyAsync(CancellationToken.None);
+        await _writer.EnsureReadyAsync(CancellationToken.None); // idempotent
+        await _writer.PublishAsync(SampleVector());
+
+        var lens = (await conn.QueryAsync<int>("SELECT octet_length(vector) FROM state_vectors ORDER BY id")).ToArray();
+        Assert.Equal(new[] { 188, 220 }, lens);
     }
 
     [Fact]

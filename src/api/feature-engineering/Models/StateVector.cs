@@ -7,7 +7,7 @@ public record StateVector(
     float[] Values
 )
 {
-    public const int Dimensions = 47;
+    public const int Dimensions = 55;
     private readonly float[] _values = ValidateValues(Values);
     public float [] Values
     {

@@ -28,7 +28,7 @@ public class StateVectorValidationTests
         Assert.Throws<ArgumentException>(() =>
             new StateVector("nginx", "default", DateTimeOffset.UtcNow, new float[StateVector.Dimensions])
             {
-                Values = new float[46]
+                Values = new float[StateVector.Dimensions - 1]
             });
     }
 }

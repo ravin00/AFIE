@@ -1,6 +1,6 @@
 from typing import Final
 
-STATE_VECTOR_DIM: Final[int] = 47
+STATE_VECTOR_DIM: Final[int] = 55
 
 FEATURE_NAMES: Final[tuple[str, ...]] = (
     # 0-8 — CPU utilisation (CpuUsageRate / CpuLimit), {5m,15m,1h} x {P50,P95,P99}
@@ -58,6 +58,16 @@ FEATURE_NAMES: Final[tuple[str, ...]] = (
     "3rd-last action: cost delta",
     "3rd-last action: SLO delta",
     "3rd-last action: hours since",
+    # 47-52 — Cloud pricing signals (workflow §5.12)
+    "Spot price ratio",
+    "Reservation coverage",
+    "Storage access frequency per hour",
+    "Region price index",
+    "Commitment discount available",
+    "Workload is stateful",
+    # 53-54 — Region migration signals
+    "Cheaper region price index",
+    "Cross-region P99 baseline (ms, normalised)",
 )
 
 if len(FEATURE_NAMES) != STATE_VECTOR_DIM:
@@ -67,7 +77,7 @@ if len(FEATURE_NAMES) != STATE_VECTOR_DIM:
     )
     
     
-"""Human-readable labels for the 47-dimensional AFIE state vector.
+"""Human-readable labels for the 55-dimensional AFIE state vector.
 
 `FEATURE_NAMES[i]` describes exactly what the C# feature-engineering service
 writes into dimension `i` of the vector returned by `GET /state/{workload}`.
@@ -80,6 +90,6 @@ src/api/feature-engineering/Features/, NOT just the architecture docs. Every
 group fills its slice window-outer / percentile-inner. If the C# ordering
 ever changes, these labels must change in lockstep or SHAP output silently
 mislabels — the import-time guard below catches a length drift, but a
-reordering within the 47 is a semantic change no assertion can catch, so
+reordering within the 55 is a semantic change no assertion can catch, so
 treat this file as coupled to the feature groups.
 """
