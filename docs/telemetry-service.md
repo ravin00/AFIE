@@ -28,8 +28,9 @@ vector assembly — those live in the
 | Verb | Path | Purpose |
 | --- | --- | --- |
 | GET | `/health` | Liveness + readiness. Returns `Healthy` / `Degraded` with `lastScrapeTime`, `eventsPublishedTotal`, `prometheusReachable`. Degraded if no scrape yet, or last scrape older than `2 × ScrapingIntervalSeconds`, or Prometheus unreachable. |
+| GET | `/metrics` | Prometheus metrics, including HTTP request metrics. |
 
-There is no `/metrics` endpoint yet. The service pulls, never pushes. Data
+The service pulls, never pushes. Data
 consumers read from the JSONL sink (or Event Hub in Phase 8).
 
 ### 2.2 Configuration
@@ -82,10 +83,12 @@ flowchart TD
 - `BackgroundService` with an infinite `await Task.Delay(interval)` loop.
 - Fires all 13 queries in parallel via `Task.WhenAll` in
   `FetchAllMetricsAsync`.
-- Catches every exception except `OperationCanceledException`, logs, and
-  flips `PrometheusReachable = false`. The loop **never** propagates, so a
-  failed cycle does not crash the pod. Query errors do not reach this handler
-  (see §3.2).
+- Catches every exception unless the host is shutting down (an HTTP timeout
+  is also an `OperationCanceledException`), logs, and flips
+  `PrometheusReachable = false`. The loop **never** propagates, so a failed
+  cycle does not crash the pod.
+- Sums all series matching a pod, so requests and limits cover every
+  container. A container without a limit adds nothing to the pod limit.
 - Derives workload name from pod name via two regex passes
   (ReplicaSet then StatefulSet). Anything unmatched falls back to the raw
   pod name — safer than dropping the event.
@@ -98,10 +101,10 @@ flowchart TD
   instant form is used today; the range form is there so downstream
   services can share the client without duplicating deserialisation.
 - Deserialises into typed records under `Models/PrometheusResponse.cs`.
-- Returns `[]` on any error, without throwing. **Known defect:** with
-  Prometheus down, the scraper sees an empty but successful cycle, keeps
-  `PrometheusReachable = true`, and `/health` stays `Healthy`. If only some
-  queries fail, their fields default to `0`.
+- Logs and throws on any error (transport, non-2xx, bad JSON, or a
+  non-`success` status). One failed query fails the whole cycle, so partial
+  data is never published as zeros. A successful query with no series still
+  returns `[]`.
 
 ### 3.3 PrometheusQueries
 
@@ -117,18 +120,13 @@ which returns a `Dictionary<name, query>` for parallel execution.
 | `LatencyP50/P95/P99` | `histogram_quantile(q, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, pod, namespace))` |
 | `CpuRequests/CpuLimits` | `kube_pod_container_resource_{requests,limits}{resource="cpu"}` |
 | `MemRequests/MemLimits` | same, `resource="memory"` |
-| `NodeCpuPressure` | `kube_node_status_condition{condition="PIDPressure",status="true"}` |
-| `NodeMemPressure` | `kube_node_status_condition{condition="MemoryPressure",status="true"}` |
+| `NodeCpuPressure` | node CPU utilisation (node-exporter) above 90%, joined to pods |
+| `NodeMemPressure` | `kube_node_status_condition{condition="MemoryPressure",status="true"}`, joined to pods |
 
-Known defects:
-
-- `NodeCpuPressure` uses `PIDPressure`, which is process-table pressure, not
-  CPU load. A load-based signal (e.g.
-  `node_load1 / count(node_cpu_seconds_total{mode="idle"})`) would be closer.
-- The node condition metrics carry no `pod` label, so the per-pod join never
-  matches them and both flags stay `false`.
-- Requests and limits are per container; the join takes only the first match,
-  so multi-container pods are under-counted.
+Node series carry no `pod` label, so both pressure queries join to
+`kube_pod_info` on `node` and return only pods on a pressured node.
+Kubernetes has no CPU pressure condition; the 90% threshold is AFIE's own. The
+CPU join assumes node-exporter's `nodename` equals the Kubernetes node name.
 
 ### 3.4 MetricEvent
 
@@ -173,7 +171,7 @@ Multi-stage [`Dockerfile`](../src/api/telemetry/Dockerfile):
 - `mcr.microsoft.com/dotnet/aspnet:8.0-alpine` for runtime.
 - Listens on `:8080`.
 - Runtime creates `/app/data` for the mounted volume.
-- No `USER` is set and the manifest has no `securityContext` (open item).
+- No `USER` is set; the manifest runs it as uid 1654.
 
 ### 4.2 Kubernetes manifest
 
@@ -187,9 +185,15 @@ Multi-stage [`Dockerfile`](../src/api/telemetry/Dockerfile):
 - Liveness and readiness probes both hit `/health`.
 - Requests 50m CPU / 64Mi memory; limits 200m / 128Mi.
 - PVC `afie-telemetry-data` at `/app/data`, shared with feature engineering.
-- The `afie-system` default-deny NetworkPolicy allows this pod DNS egress only.
-  Where policies are enforced it cannot reach Prometheus (not yet verified on
-  a cluster).
+- Non-root uid 1654, read-only root filesystem with an `emptyDir` at `/tmp`,
+  all capabilities dropped, `seccompProfile: RuntimeDefault`.
+- NetworkPolicy `telemetry-to-prometheus` allows egress to the `monitoring`
+  namespace on 9090, on top of the default DNS egress.
+- The Service port is named `http` and labelled `part-of: afie`, so the
+  `afie-services` ServiceMonitor scrapes `/metrics`.
+- Upgrading a cluster that ran the pod as root: today's JSONL file on the PVC
+  is root-owned and uid 1654 cannot append to it. `chown` it to 1654 or delete
+  it.
 
 ### 4.3 Local deploy loop
 
@@ -211,6 +215,8 @@ xUnit suite at [`tests/AFIE.Telemetry.Tests`](../tests/AFIE.Telemetry.Tests):
 - `Clients/PrometheusHttpClientTests` — feeds captured Prometheus JSON
   fixtures through a mocked `HttpMessageHandler`; asserts deserialisation
   and error handling.
+- `Services/PrometheusScraperServiceTests` — `/health` turns `Degraded` on an
+  outage or timeout; requests and limits are summed across containers.
 - `Models/MetricEventTests` — value-equality and JSON round-trip.
 - `Publishers/LocalFilePublisherTests` — writes to a temp dir, asserts
   daily filename shape, append semantics, JSON validity, and no-op on
@@ -226,15 +232,15 @@ dotnet test tests/AFIE.Telemetry.Tests/AFIE.Telemetry.Tests.csproj
 
 Coverage target per the workflow doc: 100% on `PrometheusHttpClient` and
 `MetricEvent`. Scraper + publishers are covered functionally; the scraper's
-Prometheus join is best tested end-to-end against a real Prometheus (see
+PromQL is best tested end-to-end against a real Prometheus (see
 integration test backlog in [roadmap.md](roadmap.md)).
 
 ## 6. Failure modes and operational notes
 
 | Failure | What happens | Signal |
 | --- | --- | --- |
-| Prometheus down | Every query returns `[]`; zero events published; `/health` stays `Healthy` (known defect, §3.2) | client error log |
-| Individual query fails | Client returns `[]`, that field defaults to `0` in `MetricEvent`. Other queries in the same cycle still succeed | client log |
+| Prometheus down or timing out | Cycle fails; nothing published; loop continues | `/health` `Degraded`, client error log |
+| Individual query fails | Same: the whole cycle fails | client log |
 | Publisher throws (disk full, EH auth) | Caught in scrape loop; cycle marked failed; loop continues | scraper log, `/health` staleness |
 | Long GC / stalled loop | `/health` turns `Degraded` after 2× interval | `/health` |
 | Pod restart under `local` mode | Files persist on the PVC; scraping appends to today's file | expected in dev |

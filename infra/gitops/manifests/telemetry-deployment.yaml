@@ -5,6 +5,10 @@ metadata:
   namespace: afie-system
   labels:
     app: afie-telemetry
+    app.kubernetes.io/name: afie-telemetry
+    app.kubernetes.io/part-of: afie
+    app.kubernetes.io/component: telemetry-collector
+    afie.dev/purpose: metric-collector
 spec:
   replicas: 1
   selector:
@@ -15,12 +19,24 @@ spec:
       labels:
         app: afie-telemetry
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1654
+        fsGroup: 1654
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: telemetry
           image: afie-telemetry:dev
           imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
           ports:
             - containerPort: 8080
+              name: http
           env:
             - name: Telemetry__PrometheusUrl
               value: "http://kube-prometheus-stack-prometheus.monitoring.svc:9090"
@@ -48,20 +64,28 @@ spec:
           volumeMounts:
             - name: telemetry-data
               mountPath: /app/data
+            - name: tmp
+              mountPath: /tmp
       volumes:
         - name: telemetry-data
           persistentVolumeClaim:
             claimName: afie-telemetry-data
+        - name: tmp
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: afie-telemetry
   namespace: afie-system
+  labels:
+    app: afie-telemetry
+    app.kubernetes.io/part-of: afie   # the ServiceMonitor selects on this
 spec:
   selector:
     app: afie-telemetry
   ports:
-    - port: 8080
+    - name: http
+      port: 8080
       targetPort: 8080
   type: ClusterIP

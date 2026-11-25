@@ -127,8 +127,8 @@ yet. Feature names live in
 | 53–54 | Region migration | cheaper-region price index, cross-region P99 baseline |
 
 **Not yet live:** dim 23 is reserved; 28 and 35–37 are placeholders; 38–46 stay
-zero because nothing records actions; 47–54 come from static configuration; the
-node pressure flags are broken (see
+zero because nothing records actions; 47–54 come from static configuration. CPU
+pressure is a utilisation threshold (see
 [telemetry-service.md §3.3](telemetry-service.md#33-prometheusqueries)).
 
 Cyclic encoding on temporal dims is load-bearing: hour 23 must be adjacent

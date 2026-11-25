@@ -33,7 +33,7 @@ public class PrometheusHttpClientTests
     }
 
     [Fact]
-    public async Task QueryAsync_ErrorResponse_ReturnsEmptyList()
+    public async Task QueryAsync_ErrorResponse_Throws()
     {
         var json = await File.ReadAllTextAsync("Fixtures/prometheus_error_response.json");
         var response = new HttpResponseMessage(HttpStatusCode.OK)
@@ -42,23 +42,19 @@ public class PrometheusHttpClientTests
         };
 
         var client = CreateClient(response);
-        var results = await client.QueryAsync("invalid{}");
-
-        Assert.Empty(results);
+        await Assert.ThrowsAnyAsync<InvalidOperationException>(() => client.QueryAsync("invalid{}"));
     }
 
     [Fact]
-    public async Task QueryAsync_HttpError_ReturnsEmptyList()
+    public async Task QueryAsync_HttpError_Throws()
     {
         var response = new HttpResponseMessage(HttpStatusCode.InternalServerError);
         var client = CreateClient(response);
-        var results = await client.QueryAsync("up");
-
-        Assert.Empty(results);
+        await Assert.ThrowsAnyAsync<HttpRequestException>(() => client.QueryAsync("up"));
     }
 
     [Fact]
-    public async Task QueryAsync_MalformedJson_ReturnsEmptyList()
+    public async Task QueryAsync_MalformedJson_Throws()
     {
         var response = new HttpResponseMessage(HttpStatusCode.OK)
         {
@@ -66,9 +62,7 @@ public class PrometheusHttpClientTests
         };
 
         var client = CreateClient(response);
-        var results = await client.QueryAsync("up");
-
-        Assert.Empty(results);
+        await Assert.ThrowsAnyAsync<System.Text.Json.JsonException>(() => client.QueryAsync("up"));
     }
 }
 

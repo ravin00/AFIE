@@ -48,7 +48,8 @@ public partial class PrometheusScraperService : BackgroundService
 
                 _logger.LogInformation("Scrape complete: {Count} events", events.Count);
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            // An HttpClient timeout is also an OperationCanceledException, so filter on shutdown instead.
+            catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
             {
                 _logger.LogError(ex, "Scrape cycle failed");
                 _healthState.PrometheusReachable = false;
@@ -113,22 +114,25 @@ public partial class PrometheusScraperService : BackgroundService
         if (!results.TryGetValue(queryName, out var queryResults))
             return 0;
 
-        var match = queryResults.FirstOrDefault(r =>
-            r.Metric.TryGetValue("pod", out var p) && p == pod &&
-            r.Metric.TryGetValue("namespace", out var n) && n == ns);
-
-        if (match?.Value is [_, var valObj] &&
-            double.TryParse(
-                valObj?.ToString(),
-                System.Globalization.NumberStyles.Float,
-                System.Globalization.CultureInfo.InvariantCulture,
-                out var val) &&
-            !double.IsNaN(val) &&
-            !double.IsInfinity(val))
-            return val;
-
-        return 0;
+        // Requests/limits return one series per container; every other query returns one per pod.
+        // shortcut: a container without a limit adds nothing, so the pod limit reads low; flag it if that matters.
+        return queryResults
+            .Where(r =>
+                r.Metric.TryGetValue("pod", out var p) && p == pod &&
+                r.Metric.TryGetValue("namespace", out var n) && n == ns)
+            .Sum(r => ParseValue(r.Value));
     }
+
+    private static double ParseValue(List<object>? value) =>
+        value is [_, var valObj] &&
+        double.TryParse(
+            valObj?.ToString(),
+            System.Globalization.NumberStyles.Float,
+            System.Globalization.CultureInfo.InvariantCulture,
+            out var val) &&
+        double.IsFinite(val)
+            ? val
+            : 0;
 
     private static string DeriveWorkloadName(string podName)
     {

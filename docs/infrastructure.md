@@ -11,17 +11,13 @@ provisioned.
   NodePorts
 - Config: [`scripts/kind-config.yaml`](../scripts/kind-config.yaml)
 - Bootstrap: [`scripts/setup-phase2.sh`](../scripts/setup-phase2.sh) —
-  creates the cluster and namespaces, installs kube-prometheus-stack and Argo
-  CD, and applies `app-afie.yaml` and the nginx test workload.
+  creates the cluster and namespaces, installs Argo CD (pinned `v2.13.2`) and
+  the sealed-secrets controller, then applies the AppProjects and the
+  monitoring, OpenCost and `afie` Applications. Argo CD installs
+  kube-prometheus-stack.
 
-Gaps in the script: it installs the Argo CD `stable` manifest (no pinned
-version) and does not apply `appprojects.yaml` (which `app-afie.yaml` depends
-on), `app-monitoring.yaml`, `app-opencost.yaml` or a sealed-secrets controller.
-Apply the projects after it runs:
-
-```bash
-kubectl apply -f infra/gitops/argocd/appprojects.yaml
-```
+On a new cluster, re-seal the Postgres secret (§9). The `afie` Application
+tracks `main`.
 
 Reset the cluster:
 
@@ -49,7 +45,7 @@ synthetic workload under four regimes and compare cost + SLO outcomes.
 
 ## 3. Observability — kube-prometheus-stack
 
-Installed via Helm in the `monitoring` namespace. Values overrides live at
+Installed by Argo CD from the Helm chart into the `monitoring` namespace. Values overrides live at
 [`infra/gitops/monitoring/kube-prometheus-stack.values.yaml`](../infra/gitops/monitoring/kube-prometheus-stack.values.yaml).
 
 - **Prometheus.** 7-day retention. Scrapes all pods with the standard
@@ -75,8 +71,8 @@ but is not installed on the dev cluster.
 - AppProjects ([`appprojects.yaml`](../infra/gitops/argocd/appprojects.yaml)):
   `afie` and `platform`.
 - Applications: [`app-afie.yaml`](../infra/gitops/argocd/app-afie.yaml)
-  (`infra/gitops/manifests` on `main`, automated sync with prune and
-  self-heal),
+  (`infra/gitops/overlays/dev` on `main`, automated sync with prune,
+  self-heal and retry),
   [`app-monitoring.yaml`](../infra/gitops/argocd/app-monitoring.yaml) and
   [`app-opencost.yaml`](../infra/gitops/argocd/app-opencost.yaml).
 

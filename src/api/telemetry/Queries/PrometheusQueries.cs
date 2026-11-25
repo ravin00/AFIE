@@ -35,11 +35,16 @@ public static class PrometheusQueries
     public const string MemLimits =
         "kube_pod_container_resource_limits{resource=\"memory\"}";
 
+    // Node series carry no pod label, so both pressure queries join to kube_pod_info on node.
+    // Kubernetes has no CPU pressure condition: "pressure" is node CPU utilisation above 90%.
     public const string NodeCpuPressure =
-        "kube_node_status_condition{condition=\"PIDPressure\",status=\"true\"}";
+        "max by (pod, namespace) (kube_pod_info * on (node) group_left () max by (node) (label_replace(" +
+        "(1 - avg by (instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m]))) * on (instance) group_left (nodename) node_uname_info, " +
+        "\"node\", \"$1\", \"nodename\", \"(.*)\") > 0.9))";
 
     public const string NodeMemPressure =
-        "kube_node_status_condition{condition=\"MemoryPressure\",status=\"true\"}";
+        "max by (pod, namespace) (kube_pod_info * on (node) group_left () max by (node) (" +
+        "kube_node_status_condition{condition=\"MemoryPressure\",status=\"true\"} == 1))";
 
     public static Dictionary<string, string> AllInstantQueries() => new()
     {
