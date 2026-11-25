@@ -12,6 +12,8 @@ Everything from Phase 1 of the workflow doc must be installed and on
 | Node | 20 | `node --version` |
 | pnpm | 9 | `pnpm --version` |
 | Python | 3.11 | `python --version` |
+| uv | recent | `uv --version` |
+| kubeseal, kubeconform, trivy | recent | `kubeseal --version` |
 | kubectl | 1.29+ | `kubectl version --client` |
 | helm | 3.14+ | `helm version` |
 | kind | 0.22+ | `kind version` |
@@ -23,9 +25,9 @@ Everything from Phase 1 of the workflow doc must be installed and on
 ## 2. First-time setup
 
 ```bash
-git clone https://github.com/<your-org>/afie.git
-cd afie
-scripts/setup-phase2.sh    # creates KIND, installs Prometheus/Grafana/ArgoCD
+git clone https://github.com/ravin00/AFIE.git
+cd AFIE
+scripts/setup-phase2.sh    # KIND, Prometheus/Grafana, Argo CD (see infrastructure.md §1)
 ```
 
 The script prints the Argo CD admin password at the end — copy it, then
@@ -64,7 +66,7 @@ dotnet user-secrets set "FeatureEngineering:PostgresConnectionString" \
 The service throws at startup with a clear error if this isn't set. In
 production, the connection string comes from a Kubernetes `Secret` via
 the `FeatureEngineering__PostgresConnectionString` environment variable
-(see PR 6 manifests).
+(see the feature-engineering manifest).
 
 The Postgres integration tests use Testcontainers and spin up their own
 ephemeral `postgres:16-alpine` per test class — no separate setup is
@@ -79,8 +81,8 @@ needed for `dotnet test`, but Docker must be running.
 - **Secrets.** Never commit real credentials. `appsettings.Development.json`
   is gitignored; use environment variables (`Section__Key=…`) or a local
   Kubernetes secret for anything sensitive.
-- **Manifests.** Plain YAML under `infra/gitops/manifests/`. No Kustomize
-  or Helm templating at the leaf (see
+- **Manifests.** Plain YAML under `infra/gitops/manifests/`, listed in its
+  `kustomization.yaml`. No templating of individual manifests (see
   [architecture.md §8](architecture.md#8-gitops-backend-abstraction)).
 
 ## 4. Building and testing (.NET)
@@ -109,14 +111,25 @@ service in-cluster (§6).
 
 ## 5. Building and testing (Python — Phase 5)
 
-Not yet implemented; the workflow doc's target layout:
+The same checks CI runs:
 
 ```bash
 cd src/ml
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-pytest
+uv sync --all-extras
+uv run ruff check .
+uv run mypy afie_ml
+uv run pytest -q
 ```
+
+Offline training needs a Parquet file whose columns match `FEATURE_NAMES`. No
+conversion script exists yet.
+
+```bash
+uv run afie-train-offline --data <file.parquet> --out models/afie_ppo_v1
+```
+
+`AFIEEnv` defaults to `http://localhost:8080`, which is Argo CD on the dev
+cluster. Pass `fe_base_url` for your feature-engineering port-forward.
 
 ## 6. Deploying a service to KIND
 
@@ -172,10 +185,11 @@ open "http://localhost:9090/graph?g0.expr=up"
   by image ID, not tag — a rebuild with the same tag but no content
   changes is a no-op. Confirm with `kubectl -n afie-system describe pod`
   and look at `Image ID`.
-- **ArgoCD stuck `OutOfSync`.** Manual sync is on by design; hit "Sync"
-  in the UI or `argocd app sync afie`. Auto-sync will land in Phase 8.
+- **Argo CD reverts a manual change.** Sync is automated with self-heal and
+  tracks `main`, so `kubectl apply` of branch manifests is overwritten.
 - **Tests pass locally but the pod crash-loops.** Almost always a path
-  or config issue — the container runs as non-root and the working
+  or config issue — check that the
+  mounted paths are writable by the container user. The working
   directory is `/app`; `OutputPath` in `appsettings.json` is relative
   and would resolve inside `/app`. Prefer overriding
   `Telemetry__OutputPath=/app/data` in the manifest (already done).

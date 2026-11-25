@@ -37,6 +37,7 @@ recommendation issuance — those live in Phase 5 (RL agent) and Phase 6
 | GET | `/health` | Composite: `feature-engineering` check + `postgres` (`AddNpgSql`) check. |
 | GET | `/readiness` | Same composite. Wired to the readiness probe. |
 | GET | `/health/live` | Liveness only — predicate excludes all registered checks. |
+| GET | `/metrics` | Prometheus metrics, including HTTP request metrics. |
 
 The service pulls (or reads a file, or reads Event Hub) — it never
 receives push traffic.
@@ -51,7 +52,7 @@ property is **required at runtime** and never lives in the repo — see
 | Key | Default | Source in prod | Notes |
 | --- | --- | --- | --- |
 | `FeatureEngineering:WindowCapacity` | `240` | appsettings | 240 samples × 15s = 1h window |
-| `FeatureEngineering:EventStalenessThresholdSeconds` | `60` | appsettings | Informational; code uses 15s×3 |
+| `FeatureEngineering:EventStalenessThresholdSeconds` | `60` | appsettings | Unused; the health check hard-codes 15s × 3 |
 | `FeatureEngineering:ConsumerMode` | `local` | env in manifest | `local` \| `eventhub` |
 | `FeatureEngineering:InputPath` | `experiments/results` | env `/app/data` | JSONL source dir |
 | `FeatureEngineering:OffsetStatePath` | `experiments/state/fe_consumer_offset.json` | env | Consumer checkpoint |
@@ -62,6 +63,7 @@ property is **required at runtime** and never lives in the repo — see
 | `FeatureEngineering:ConfiguredBudgetUsdPerHour` | `10.0` | appsettings | Simulated cost feature (dim 29) |
 | `FeatureEngineering:CpuCostPerCoreHourUsd` | `0.031` | appsettings | Simulated cost |
 | `FeatureEngineering:MemCostPerGiBHourUsd` | `0.004` | appsettings | Simulated cost |
+| `FeatureEngineering:DefaultCloudPricing`, `:CloudPricing` | built-in defaults, empty | appsettings | Static pricing profiles for dims 47–54 |
 | `EventHub:*` | — | Phase 8 | Consumed only when `ConsumerMode=eventhub` |
 
 ## 3. Internals
@@ -71,7 +73,7 @@ flowchart LR
     JSONL[(shared PVC:<br/>telemetry_YYYY-MM-DD.jsonl)] -->|tail| C[LocalJsonlTailConsumer]
     C -->|MetricEvent| WS[WindowStore]
     WS -->|Snapshot| SVB[StateVectorBuilder]
-    FG[8× IFeatureGroup] -->|compose| SVB
+    FG[9× IFeatureGroup] -->|compose| SVB
     AH[ActionHistoryStore] -->|Recent| SVB
     SVB -->|float[55]| API[/GET /state/{workload}/]
     SVB -->|float[55]| EM[StateVectorEmitterService<br/>every 60s]
@@ -104,7 +106,7 @@ flowchart LR
   Consumer is the sole writer; HTTP handler + emitter are readers. Ctor
   validates `WindowCapacity > 0`.
 - **`ActionHistoryStore`** — same shape, capacity 3, for the action
-  history feature group (dims 38–46). Empty until Phase 6 posts to it.
+  history feature group (dims 38–46). Nothing records to it yet (Phase 6).
 
 ### 3.3 Feature groups + builder
 
@@ -130,9 +132,9 @@ for the full dimension table):
 | `AppSignalFeatures` | 18–23 | req/s (`tanh`), error rate, latency P50/P95/P99, one reserved dim |
 | `NodePressureFeatures` | 24–26 | CPU/mem pressure flags + eviction proximity |
 | `CostFeatures` | 27–29 | Simulated `$/hr`, 7-day trend (0, Phase 8), budget fraction |
-| `TemporalFeatures` | 30–34 | sin/cos hour, sin/cos day-of-week, days-since-deploy |
+| `TemporalFeatures` | 30–34 | sin/cos hour, sin/cos day-of-week, age of latest sample in days / 365 |
 | `DeploymentFeatures` | 35–37 | replicas, HPA target, rolling flag (placeholders — Phase 6) |
-| `ActionHistoryFeatures` | 38–46 | last 3 × (cost Δ, SLO Δ, minutes since) |
+| `ActionHistoryFeatures` | 38–46 | last 3 × (cost Δ, SLO Δ, minutes since / 60, capped at 1) |
 | `CloudPricingFeatures` | 47–54 | spot ratio, reservation coverage, storage access/h (`tanh`), region price index, commitment available, is-stateful, cheaper-region index, cross-region P99 (ms/1000). Static per-workload profiles from `FeatureEngineering:CloudPricing` (fallback `DefaultCloudPricing`) until live price APIs land |
 
 `StateVectorBuilder` composes them:
@@ -153,8 +155,8 @@ for the full dimension table):
   Phase 5 Python trainer will `np.frombuffer(row['vector'], dtype='<f4')`.
   Every call updates `FeatureEngineeringHealthState.PostgresReachable`
   + `StateVectorsWrittenTotal`.
-- **`AzureMlFeatureStorePublisher`** (Phase 8 stub). Logs a warning and
-  throws `NotImplementedException` if invoked.
+- **`AzureMlFeatureStorePublisher`** (Phase 8 stub). Throws
+  `NotImplementedException`; `PublisherMode=azureml` is rejected at startup.
 
 Schema (executed by `EnsureReadyAsync`):
 
@@ -165,10 +167,13 @@ CREATE TABLE IF NOT EXISTS state_vectors (
   namespace  TEXT        NOT NULL,
   ts         TIMESTAMPTZ NOT NULL,
   vector     BYTEA       NOT NULL,
-  CHECK (octet_length(vector) = 220)
+  CONSTRAINT state_vectors_vector_check CHECK (octet_length(vector) = 220)
 );
 CREATE INDEX IF NOT EXISTS idx_sv_workload_ts ON state_vectors(workload, ts DESC);
 ```
+
+An existing 188-byte (47-dim) check is swapped for the 220-byte one as
+`NOT VALID`, so historical rows remain; readers must handle both lengths.
 
 The `(workload, ts DESC)` index matches the Phase 5 access pattern:
 "give me the last N vectors for this workload".
@@ -203,7 +208,7 @@ volumes at those paths without permission issues.
   `until nc -z afie-postgres 5432; do sleep 2; done`.
 - **Pod affinity** requires co-location with the `afie-telemetry` pod on
   the same node — both mount the shared `afie-telemetry-data` RWO PVC.
-- **Security context**: non-root uid 1000, `allowPrivilegeEscalation:
+- **Security context**: non-root uid 1654, all capabilities dropped, `allowPrivilegeEscalation:
   false`, `seccompProfile: RuntimeDefault`.
 - **Volumes**: `telemetry-in` → PVC `afie-telemetry-data` read-only at
   `/app/data`; `fe-state` → PVC `afie-fe-state` at
@@ -212,22 +217,20 @@ volumes at those paths without permission issues.
   `InputPath=/app/data`, `OffsetStatePath=/app/experiments/state/…`,
   `PostgresConnectionString` from `secretKeyRef: {name: afie-postgres,
   key: CONNECTION_STRING}`.
-- **Probes**: `readinessProbe` → `/readiness`; `livenessProbe` →
+- **Probes**: `readinessProbe` → `/health`; `livenessProbe` →
   `/health/live`.
 - **Resources**: 100m/128Mi req, 500m/512Mi limit.
 
-Companion resources from PR 6:
+Companion resources:
 - `postgres-statefulset.yaml` + `postgres-service.yaml` — single-replica
   `postgres:16-alpine` with a 5Gi PVC template.
 - `afie-telemetry-data-pvc.yaml` (1Gi RWO) — shared JSONL volume.
 - `afie-fe-state-pvc.yaml` (1Gi RWO) — FE consumer offset volume.
-- `feature-engineering-secret.example` — template only; the
-  **authoritative bootstrap is §4.4**. The example uses outdated key
-  names.
+- `afie-postgres.sealed.yaml` — the Postgres `SealedSecret` (§4.4).
 
 ### 4.3 Local deploy loop
 
-Prerequisite: the one-time secret bootstrap in §4.4.
+Prerequisite: the secret from §4.4.
 
 ```bash
 docker build -t afie-feature-engineering:dev -f src/api/feature-engineering/Dockerfile .
@@ -248,19 +251,20 @@ curl -s localhost:8081/health | jq
 The manifest reads a single `Secret` named `afie-postgres` in
 `afie-system`. It carries both the DB init variables (consumed by the
 Postgres StatefulSet via `envFrom`) and the connection string (consumed
-by the FE deployment via `secretKeyRef`).
+by the FE deployment via `secretKeyRef`). It is committed encrypted as
+`afie-postgres.sealed.yaml`.
+
+SealedSecrets decrypt only on the cluster that sealed them, so a new cluster
+needs a re-seal (requires `kubeseal` and a running sealed-secrets controller,
+which `setup-phase2.sh` does not install):
 
 ```bash
-PG_PASSWORD="$(openssl rand -hex 12)"
-kubectl -n afie-system create secret generic afie-postgres \
-  --from-literal=POSTGRES_DB=afie \
-  --from-literal=POSTGRES_USER=afie \
-  --from-literal=POSTGRES_PASSWORD="$PG_PASSWORD" \
-  --from-literal=CONNECTION_STRING="Host=afie-postgres;Port=5432;Database=afie;Username=afie;Password=$PG_PASSWORD"
+POSTGRES_USER=afie POSTGRES_DB=afie POSTGRES_PASSWORD="$(openssl rand -hex 12)" scripts/seal-postgres-secret.sh
 ```
 
-**Rotation:** re-run the command with a new password + `kubectl rollout
-restart statefulset/afie-postgres deploy/afie-feature-engineering`.
+**Rotation:** re-seal, apply, then restart both workloads. Postgres reads
+`POSTGRES_PASSWORD` only when it initialises an empty volume, so an existing
+database also needs `ALTER USER`.
 
 **Phase 8** replaces this with Azure Key Vault via the Secrets Store CSI
 driver.
@@ -300,15 +304,12 @@ dotnet test tests/AFIE.FeatureEngineering.Tests/
 
 ## 7. What changes in Phase 8
 
-- Set `ConsumerMode=eventhub` and populate `EventHub__*` — the code path
-  exists; the stub becomes the real `EventProcessorClient`
-  implementation.
-- Set `PublisherMode=azureml` — the stub becomes a Feature Store REST
-  client.
+- Implement `EventHubConsumer` with `EventProcessorClient` (a stub today),
+  then set `ConsumerMode=eventhub` and populate `EventHub__*`.
+- Implement the Feature Store REST client, then allow
+  `PublisherMode=azureml`.
 - Move the Postgres `Secret` to Azure Key Vault via the Secrets Store CSI
   driver — the manifest's `secretKeyRef` swaps for a
   `SecretProviderClass` mount; no code change.
-- Consider a `NetworkPolicy` locking `afie-postgres` to the FE pod's
-  ServiceAccount.
 - Cost feature dim 28 (7-day trend) becomes real once Cosmos DB provides
   a long-window store.

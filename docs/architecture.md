@@ -8,9 +8,9 @@ that decision against safety rules, and applies changes through Git so every
 action is auditable and reversible.
 
 The system is split into six independently deployable components and one
-shared observability stack. Only the telemetry pipeline is fully implemented
-today; the rest are described here as designed so the architecture is
-coherent end-to-end.
+shared observability stack. Telemetry and feature engineering are built, the
+RL agent is partly built, and the rest are described here as designed so the
+architecture is coherent end-to-end. Status is in [README.md](README.md).
 
 ## 2. High-level architecture
 
@@ -39,7 +39,7 @@ flowchart LR
     Feat -->|tail JSONL| Sink
     Feat -->|55-dim vectors, BYTEA| PG[(afie-postgres:<br/>state_vectors)]
 
-    RL["RL Agent (Python/Flask) — planned"]
+    RL["RL Agent (Python) — in progress, no server yet"]
     Op -->|POST /predict| RL
     RL -->|action + SHAP| Op
     Op -->|open PR| Git[(GitHub: infra/gitops/manifests)]
@@ -62,14 +62,14 @@ runtime behaviour.
 | - | --- | --- | --- | --- | --- |
 | 1 | Telemetry Service | ASP.NET Core 8 | 3 | Built | Scrape Prometheus every 15s, publish `MetricEvent`s |
 | 2 | Feature Engineering | ASP.NET Core 8 + MathNet + Npgsql | 4 | Built | 55-dim state vector via `/state/{workload}`; 60s emitter persists to Postgres |
-| 3 | RL Agent | Python 3.11, Stable-Baselines3, SHAP, Flask | 5 | Planned | PPO policy; serves `POST /predict`; SHAP explanations |
+| 3 | RL Agent | Python 3.11, Stable-Baselines3; SHAP + FastAPI planned | 5 | In progress | Environments and offline PPO trainer built; `POST /predict` and explanations planned |
 | 4 | AFIE Operator | .NET 8 + KubeOps + Octokit | 6 | Planned | Reconcile `ResourceRecommendation` CRDs, run PCL, open PRs |
-| 5 | BFF API | ASP.NET Core 8 | 7 | Planned | Aggregate SQLite audit log + Prometheus for the UI |
+| 5 | BFF API | ASP.NET Core 8 | 7 | Planned | Aggregate Postgres audit log + Prometheus for the UI |
 | 6 | Dashboard | React 18 + Vite + shadcn/ui | 7 | Planned | Cost, action history, XAI, SLO heatmap, override |
 | — | Observability | kube-prometheus-stack + Grafana | 2 | Built | Metrics store used by every component |
-| — | GitOps | Argo CD (Flux swappable) | 2 | Built | Applies committed manifests to the cluster |
+| — | GitOps | Argo CD (Flux planned as an alternative) | 2 | Built | Applies committed manifests to the cluster |
 
-## 4. Data flow (steady state, all phases live)
+## 4. Data flow (target design, all phases live)
 
 ```mermaid
 sequenceDiagram
@@ -89,45 +89,54 @@ sequenceDiagram
     T->>F: MetricEvent JSONL (or Event Hub in Phase 8)
     F->>F: build 55-dim state vector<br/>(sliding 1h window)
     O->>F: GET /state/{workload}
-    O->>R: POST /predict [55]
-    R-->>O: action 0..24, confidence, SHAP, explanation
-    O->>O: PCL engine — 4 safety rules
+    O->>R: POST /predict float[55]
+    R-->>O: 7-lever action, confidence, SHAP, explanation
+    O->>O: PCL engine — 9 safety rules
     alt approved
         O->>G: open PR with Helm patch + XAI in body
         G-->>A: webhook / poll
         A->>S: kubectl apply
-        O->>P: sample P99, error rate T+60s
+        O->>P: SLO burn rate (5m and 1h windows)
         alt SLO regressed
             O->>G: revert commit
         end
     else rejected
-        O->>O: log RejectionReason to SQLite
+        O->>O: log rejection reason to Postgres
     end
 ```
 
 ## 5. The 55-dimensional state vector
 
 The RL agent's observation space is `Box(-1, 1, shape=(55,))`. Feature
-engineering is responsible for producing this vector exactly the same way
-in training (from the Azure Public Dataset 2020) and in production (from
-live `MetricEvent`s).
+engineering produces the vector from live `MetricEvent`s. Training will use the
+Azure Public Dataset, but the conversion script to this schema does not exist
+yet. Feature names live in
+[`feature_names.py`](../src/ml/afie_ml/feature_names.py).
 
 | Dims | Group | Content |
 | --- | --- | --- |
-| 0–8 | CPU | request, limit, P50/P95/P99 over 5m / 15m / 1h |
-| 9–17 | Memory | same layout, memory in GiB before normalisation |
-| 18–23 | App signals | req/s, error rate, P50/P95/P99 latency, 5m |
-| 24–26 | Node pressure | CPU pressure, mem pressure, eviction proximity |
+| 0–8 | CPU | usage / limit, {P50, P95, P99} over 5m / 15m / 1h |
+| 9–17 | Memory | same layout |
+| 18–23 | App signals | req/s, error rate, P50/P95/P99 latency (5m), one reserved |
+| 24–26 | Node pressure | CPU pressure, memory pressure, eviction proximity |
 | 27–29 | Cost | $/hr estimate, 7-day trend, budget fraction |
-| 30–34 | Temporal | sin/cos hour, sin/cos day-of-week, days-since-deploy |
+| 30–34 | Temporal | sin/cos hour, sin/cos day-of-week, age of latest sample |
 | 35–37 | Deployment | replica count, HPA target, rolling-update flag |
-| 38–46 | Action history | last 3 actions × (cost Δ, SLO Δ, minutes since) |
+| 38–46 | Action history | last 3 actions × (cost Δ, SLO Δ, time since) |
 | 47–52 | Cloud pricing | spot ratio, reservation coverage, storage access freq, region price index, commitment available, is-stateful |
 | 53–54 | Region migration | cheaper-region price index, cross-region P99 baseline |
 
+**Not yet live:** dim 23 is reserved; 28 and 35–37 are placeholders; 38–46 stay
+zero because nothing records actions; 47–54 come from static configuration; the
+node pressure flags are broken (see
+[telemetry-service.md §3.3](telemetry-service.md#33-prometheusqueries)).
+
 Cyclic encoding on temporal dims is load-bearing: hour 23 must be adjacent
-to hour 0 in feature space. All values are clamped to `[-2, 2]` and NaN/Inf
-are coerced to zero.
+to hour 0 in feature space. The C# builder clamps to `[-2, 2]` and coerces
+NaN/Inf to zero; the Python environments clip to `[-1, 1]`.
+
+Forecast features are not part of this vector. They are planned as four more
+dimensions (59).
 
 > **Note on CPU/Memory dims (0–8, 9–17).** Each 9-slot group is
 > `{P50, P95, P99} × {5m, 15m, 1h}` of `usage / limit` —
@@ -139,26 +148,49 @@ are coerced to zero.
 
 ## 6. Action space and reward
 
-- **Action space:** `Discrete(25)`. `levels = [-20, -10, 0, +10, +20]` percent.
-  `cpu_adj = levels[a // 5]`, `mem_adj = levels[a % 5]`. Same layout for
-  offline replay and live inference.
-- **Reward:** `R = 0.5·cost_delta + 0.3·slo_compliance + 0.1·carbon_delta − 10.0·policy_violations`.
-  The `policy_violations` coefficient is deliberately dominant — the agent
-  should never learn to game the PCL.
+**Action space:** `MultiDiscrete([5,5,3,3,3,2,3])`, 4,050 joint actions
+([`actions.py`](../src/ml/afie_ml/actions.py)).
+
+| Dim | Lever | Options |
+| --- | --- | --- |
+| 0 | CPU adjustment | −20, −10, 0, +10, +20 % |
+| 1 | Memory adjustment | −20, −10, 0, +10, +20 % |
+| 2 | Instance lifecycle | on-demand, reserved-1yr, spot |
+| 3 | Commitment plan | none, savings-plan-1yr, savings-plan-3yr |
+| 4 | Storage tier | hot, cool, archive |
+| 5 | Scheduling | always-on, off-hours scale-down |
+| 6 | Region | stay, cheaper same continent, cheapest global |
+
+**Reward** ([`reward.py`](../src/ml/afie_ml/reward.py)):
+
+`R = 0.30·cost + 0.20·cloud_savings + 0.10·region_savings + 0.20·slo + 0.08·carbon − 0.05·egress − 10·violations`
+
+The positive terms sum to at most 0.88, so one violation always dominates. The
+inputs come from a training-time heuristic
+([`heuristic.py`](../src/ml/afie_ml/heuristic.py)), not from measured cost or
+SLO data.
 
 ## 7. Policy Constraint Language (PCL)
 
-Every action from the RL agent passes through four rules before the
-operator opens a PR:
+**Planned (Phase 6).** Every action will pass nine rules before the operator
+opens a PR:
 
-1. `|adjustment| ≤ 20%` per axis (CPU, memory).
-2. `new_limit ≥ P99_usage × 1.10` — leaves 10% headroom.
-3. No rolling update currently in flight for that workload.
-4. 30-minute cooldown since the last applied action on that workload.
+| Rule | Check |
+| --- | --- |
+| R1 | CPU and memory adjustment ≤ 20% |
+| R2 | New limit ≥ P99 usage × 1.10 |
+| R3 | No rolling update in progress |
+| R4 | 30-minute cooldown per workload |
+| R5 | No spot for stateful workloads |
+| R6 | Reserved capacity ≥ 30% of the 7-day baseline |
+| R7 | Region move only if P99 ≤ current + 20 ms |
+| R8 | Storage downgrade only if access < 0.01/h for 7 days |
+| R9 | No cheapest-global move for stateful or data-residency-tagged workloads |
 
-The PCL is deliberately simple and boundary-testable. It is *not* the
-place for ML — it is the audit boundary that a reviewer or SRE can read in
-one page.
+R1, R2 and R5 are to be mirrored in a Kubernetes `ValidatingAdmissionPolicy`.
+The PCL is deliberately simple and boundary-testable: it is the audit boundary
+a reviewer or SRE can read in one page. Today only the training reward
+penalises headroom and stateful spot / global-move violations.
 
 ## 8. GitOps backend abstraction
 
@@ -166,8 +198,8 @@ The operator writes plain rendered manifests to
 `infra/gitops/manifests/{workload}.yaml`. Both Argo CD (`Application`) and
 Flux (`Kustomization`) can sync the same path. An `IGitOpsBackend`
 abstraction (`ArgoBackend`, `FluxBackend`, `DirectApplyBackend`) hides the
-difference — the health checker uses it to poll for sync + apply completion
-before sampling SLOs for the rollback decision.
+difference — the SLO verifier uses it to poll for sync + apply completion
+before the burn-rate check that decides on rollback. All of this is planned.
 
 Never run Argo CD and Flux against the same path in the same cluster.
 
@@ -179,13 +211,13 @@ shared `ReadWriteOnce` PVC in `afie-system`; feature engineering mounts
 the same PVC read-only and consumes the files. Persisted state vectors
 land in a single-replica `afie-postgres` StatefulSet with a 5Gi PVC. Both
 service pods must co-locate on the same node (RWO PVC constraint),
-enforced by pod affinity. The RL agent runs as a local Flask process on
+enforced by pod affinity. The RL agent is planned as a local FastAPI process on
 `localhost:5001`; the dashboard runs on Vite dev server at
 `localhost:5173`.
 
 **Production (Phases 8–9, planned):** Azure Event Hub replaces the file
-sink for telemetry; Cosmos DB replaces SQLite for the audit log; Azure ML
-optionally replaces the local Flask inference server (falls back to Flask
+sink for telemetry; Cosmos DB replaces Postgres for the audit log; Azure ML
+optionally replaces the local inference server (falls back to the local server
 if the student subscription blocks it); Static Web Apps hosts the
 dashboard. AKS is *not* used — the student subscription blocks it — so
 the cluster stays on KIND for experiments and moves to any managed

@@ -14,11 +14,12 @@ Source: [`src/api/telemetry/`](../src/api/telemetry/) · Tests:
 - Join per-pod results across queries and emit one `MetricEvent` per pod.
 - Persist events reliably (append-only file today, partitioned Event Hub
   later).
-- Expose `/health` with staleness detection so Kubernetes can restart the
-  pod when scraping falls behind.
+- Expose `/health` with staleness detection. `Degraded` still returns HTTP
+  200, so the probes do not restart the pod for it.
 
 Not responsible for: feature normalisation, sliding windows, or state
-vector assembly — those live in the (planned) feature engineering service.
+vector assembly — those live in the
+[feature engineering service](feature-engineering-service.md).
 
 ## 2. Public surface
 
@@ -28,7 +29,7 @@ vector assembly — those live in the (planned) feature engineering service.
 | --- | --- | --- |
 | GET | `/health` | Liveness + readiness. Returns `Healthy` / `Degraded` with `lastScrapeTime`, `eventsPublishedTotal`, `prometheusReachable`. Degraded if no scrape yet, or last scrape older than `2 × ScrapingIntervalSeconds`, or Prometheus unreachable. |
 
-There is no ingress endpoint — the service pulls, never pushes. Data
+There is no `/metrics` endpoint yet. The service pulls, never pushes. Data
 consumers read from the JSONL sink (or Event Hub in Phase 8).
 
 ### 2.2 Configuration
@@ -82,9 +83,9 @@ flowchart TD
 - Fires all 13 queries in parallel via `Task.WhenAll` in
   `FetchAllMetricsAsync`.
 - Catches every exception except `OperationCanceledException`, logs, and
-  flips `PrometheusReachable = false`. The loop **never** propagates —
-  transient Prometheus outages must not crash the pod, or the deployment's
-  liveness probe would enter a restart storm alongside the outage.
+  flips `PrometheusReachable = false`. The loop **never** propagates, so a
+  failed cycle does not crash the pod. Query errors do not reach this handler
+  (see §3.2).
 - Derives workload name from pod name via two regex passes
   (ReplicaSet then StatefulSet). Anything unmatched falls back to the raw
   pod name — safer than dropping the event.
@@ -97,9 +98,10 @@ flowchart TD
   instant form is used today; the range form is there so downstream
   services can share the client without duplicating deserialisation.
 - Deserialises into typed records under `Models/PrometheusResponse.cs`.
-- Returns `[]` on any error — the caller (scraper) then produces an empty
-  `MetricEvent` list for that cycle. This is intentional: partial data is
-  worse than a skipped cycle.
+- Returns `[]` on any error, without throwing. **Known defect:** with
+  Prometheus down, the scraper sees an empty but successful cycle, keeps
+  `PrometheusReachable = true`, and `/health` stays `Healthy`. If only some
+  queries fail, their fields default to `0`.
 
 ### 3.3 PrometheusQueries
 
@@ -118,15 +120,19 @@ which returns a `Dictionary<name, query>` for parallel execution.
 | `NodeCpuPressure` | `kube_node_status_condition{condition="PIDPressure",status="true"}` |
 | `NodeMemPressure` | `kube_node_status_condition{condition="MemoryPressure",status="true"}` |
 
-Known drift: `NodeCpuPressure` currently uses `PIDPressure`, which is
-process-table pressure, not CPU load. `kube_node_status_condition` has no
-literal `CPUPressure`; a load-based signal (e.g.
-`node_load1 / count(node_cpu_seconds_total{mode="idle"})`) would match the
-workflow doc's intent better. Tracked for a follow-up.
+Known defects:
+
+- `NodeCpuPressure` uses `PIDPressure`, which is process-table pressure, not
+  CPU load. A load-based signal (e.g.
+  `node_load1 / count(node_cpu_seconds_total{mode="idle"})`) would be closer.
+- The node condition metrics carry no `pod` label, so the per-pod join never
+  matches them and both flags stay `false`.
+- Requests and limits are per container; the join takes only the first match,
+  so multi-container pods are under-counted.
 
 ### 3.4 MetricEvent
 
-16-field immutable record — see [`Models/MetricEvents.cs`](../src/api/telemetry/Models/MetricEvents.cs).
+16-field immutable record — see [`MetricEvent.cs`](../src/shared/AFIE.Contracts/MetricEvent.cs).
 
 | Field | Type | Unit |
 | --- | --- | --- |
@@ -166,7 +172,8 @@ Multi-stage [`Dockerfile`](../src/api/telemetry/Dockerfile):
 - `mcr.microsoft.com/dotnet/sdk:8.0` for build.
 - `mcr.microsoft.com/dotnet/aspnet:8.0-alpine` for runtime.
 - Listens on `:8080`.
-- Runtime creates `/app/data` for the mounted `emptyDir` volume.
+- Runtime creates `/app/data` for the mounted volume.
+- No `USER` is set and the manifest has no `securityContext` (open item).
 
 ### 4.2 Kubernetes manifest
 
@@ -179,9 +186,10 @@ Multi-stage [`Dockerfile`](../src/api/telemetry/Dockerfile):
   service; `Telemetry__OutputPath` overrides to `/app/data`.
 - Liveness and readiness probes both hit `/health`.
 - Requests 50m CPU / 64Mi memory; limits 200m / 128Mi.
-- `emptyDir` volume at `/app/data` — data does not survive pod restart
-  (this is intentional in dev; Phase 8 switches to Event Hub for
-  durability).
+- PVC `afie-telemetry-data` at `/app/data`, shared with feature engineering.
+- The `afie-system` default-deny NetworkPolicy allows this pod DNS egress only.
+  Where policies are enforced it cannot reach Prometheus (not yet verified on
+  a cluster).
 
 ### 4.3 Local deploy loop
 
@@ -189,6 +197,7 @@ Multi-stage [`Dockerfile`](../src/api/telemetry/Dockerfile):
 # from repo root, after Phase 2 bootstrap
 docker build -t afie-telemetry:dev -f src/api/telemetry/Dockerfile .
 kind load docker-image afie-telemetry:dev --name afie-dev
+kubectl apply -f infra/gitops/manifests/afie-telemetry-data-pvc.yaml
 kubectl apply -f infra/gitops/manifests/telemetry-deployment.yaml
 kubectl -n afie-system rollout status deploy/afie-telemetry
 kubectl -n afie-system port-forward svc/afie-telemetry 8080:8080
@@ -206,6 +215,8 @@ xUnit suite at [`tests/AFIE.Telemetry.Tests`](../tests/AFIE.Telemetry.Tests):
 - `Publishers/LocalFilePublisherTests` — writes to a temp dir, asserts
   daily filename shape, append semantics, JSON validity, and no-op on
   empty input.
+- `Publishers/MetricPublisherStrategyResolverTests` — publisher selection by
+  `OutputMode`.
 
 Run:
 
@@ -222,19 +233,20 @@ integration test backlog in [roadmap.md](roadmap.md)).
 
 | Failure | What happens | Signal |
 | --- | --- | --- |
-| Prometheus down | Scraper logs error, marks `PrometheusReachable=false`, `/health` goes `Degraded`, no events published | `/health`, pod log |
+| Prometheus down | Every query returns `[]`; zero events published; `/health` stays `Healthy` (known defect, §3.2) | client error log |
 | Individual query fails | Client returns `[]`, that field defaults to `0` in `MetricEvent`. Other queries in the same cycle still succeed | client log |
 | Publisher throws (disk full, EH auth) | Caught in scrape loop; cycle marked failed; loop continues | scraper log, `/health` staleness |
-| Long GC / clock skew | `/health` `staleness` field diverges from `ScrapingIntervalSeconds`; probes flag `Degraded` after 2× interval | `/health` |
-| Pod restart under `local` mode | In-flight `emptyDir` file lost; next scrape starts a new file for today's date | expected in dev |
+| Long GC / stalled loop | `/health` turns `Degraded` after 2× interval | `/health` |
+| Pod restart under `local` mode | Files persist on the PVC; scraping appends to today's file | expected in dev |
 
 ## 7. What changes in Phase 8
 
 - Set `Telemetry__OutputMode=eventhub` and populate `EventHub__*`.
 - Deployment gets a managed identity with `Azure Event Hubs Data Sender`
   on the target namespace.
-- `emptyDir` volume is removed; there is no local sink to preserve.
-- Feature engineering swaps from JSONL tailing to `EventProcessorClient`.
+- The shared PVC is no longer needed.
+- Feature engineering swaps from JSONL tailing to `EventProcessorClient`
+  (its consumer is still a stub).
 
 No code change is required for the switch — the DI binding in `Program.cs`
 already selects the publisher from config.

@@ -7,11 +7,21 @@ provisioned.
 ## 1. Cluster — KIND
 
 - Cluster name: `afie-dev`
-- Single control-plane node, one worker (default KIND topology)
+- Single control-plane node, with host ports 3000, 9090 and 8080 mapped to
+  NodePorts
 - Config: [`scripts/kind-config.yaml`](../scripts/kind-config.yaml)
 - Bootstrap: [`scripts/setup-phase2.sh`](../scripts/setup-phase2.sh) —
-  creates the cluster, installs kube-prometheus-stack, installs Argo CD,
-  applies namespaces, and prints the ArgoCD admin password.
+  creates the cluster and namespaces, installs kube-prometheus-stack and Argo
+  CD, and applies `app-afie.yaml` and the nginx test workload.
+
+Gaps in the script: it installs the Argo CD `stable` manifest (no pinned
+version) and does not apply `appprojects.yaml` (which `app-afie.yaml` depends
+on), `app-monitoring.yaml`, `app-opencost.yaml` or a sealed-secrets controller.
+Apply the projects after it runs:
+
+```bash
+kubectl apply -f infra/gitops/argocd/appprojects.yaml
+```
 
 Reset the cluster:
 
@@ -28,7 +38,7 @@ Defined in [`infra/gitops/namespaces.yaml`](../infra/gitops/namespaces.yaml):
 | --- | --- |
 | `monitoring` | kube-prometheus-stack (Prometheus, Alertmanager, Grafana) |
 | `afie-system` | AFIE control-plane pods — telemetry, feature-engineering, `afie-postgres` StatefulSet, operator (Phase 6), BFF (Phase 7) |
-| `argocd` | Argo CD server + controllers |
+| `argocd` | Argo CD server + controllers (created by the setup script, not in this file) |
 | `baseline-manual` | Baseline workload — human-tuned resource requests (Phase 9 experiment) |
 | `baseline-vpa` | Baseline — Vertical Pod Autoscaler managing requests |
 | `baseline-threshold` | Baseline — simple utilisation-threshold controller |
@@ -47,15 +57,11 @@ Installed via Helm in the `monitoring` namespace. Values overrides live at
   `http://kube-prometheus-stack-prometheus.monitoring.svc:9090`.
 - **Grafana.** Dashboards imported by ID: `6417` (cluster overview),
   `15757` (pods). Access notes in [doc.md](doc.md).
-- **Alertmanager.** Default routing; not used by AFIE — the operator has
-  its own SLO check for rollback decisions.
+- **Alertmanager.** Default routing; not used by AFIE. The planned operator
+  does its own SLO check for rollback decisions.
 
-Port-forwards:
-
-```bash
-kubectl -n monitoring port-forward svc/kube-prometheus-stack-grafana 3000:80
-kubectl -n monitoring port-forward svc/kube-prometheus-stack-prometheus 9090:9090
-```
+Local access is by NodePort (Grafana `http://localhost:3000`, Prometheus
+`http://localhost:9090`).
 
 ## 4. GitOps — Argo CD
 
@@ -63,19 +69,16 @@ Argo CD is the default GitOps controller. Flux is a supported adapter
 (see [architecture.md §8](architecture.md#8-gitops-backend-abstraction))
 but is not installed on the dev cluster.
 
-- Server exposed via NodePort:
-  [`argocd-server-nodeport.yaml`](../infra/gitops/argocd/argocd-server-nodeport.yaml).
-- Root application:
-  [`app-afie.yaml`](../infra/gitops/argocd/app-afie.yaml) — points at
-  `infra/gitops/manifests` in this repo; sync policy is manual for now
-  so demos are deterministic.
-
-Access:
-
-```bash
-kubectl -n argocd port-forward svc/argocd-server 8080:443
-# then open https://localhost:8080 — accept the self-signed cert
-```
+- Server exposed via NodePort at `http://localhost:8080`
+  ([`argocd-server-nodeport.yaml`](../infra/gitops/argocd/argocd-server-nodeport.yaml));
+  the setup script runs it in insecure (HTTP) mode.
+- AppProjects ([`appprojects.yaml`](../infra/gitops/argocd/appprojects.yaml)):
+  `afie` and `platform`.
+- Applications: [`app-afie.yaml`](../infra/gitops/argocd/app-afie.yaml)
+  (`infra/gitops/manifests` on `main`, automated sync with prune and
+  self-heal),
+  [`app-monitoring.yaml`](../infra/gitops/argocd/app-monitoring.yaml) and
+  [`app-opencost.yaml`](../infra/gitops/argocd/app-opencost.yaml).
 
 Admin password retrieval is in [doc.md](doc.md).
 
@@ -84,25 +87,19 @@ Admin password retrieval is in [doc.md](doc.md).
 ```
 infra/gitops/
   namespaces.yaml           Cluster namespaces
-  crds/                     Phase 6 — ResourceRecommendation CRD (scaffold)
-  manifests/                Plain rendered manifests — the operator (Phase 6) writes here
-    telemetry-deployment.yaml
-    nginx-test.yaml
-    afie-telemetry-data-pvc.yaml          # shared PVC (telemetry RW, FE RO)
-    afie-fe-state-pvc.yaml                # FE consumer offset
-    postgres-service.yaml
-    postgres-statefulset.yaml             # afie-postgres, 5Gi PVC template
-    feature-engineering-deployment.yaml   # requires afie-postgres Secret
-    feature-engineering-secret.example    # template only — see
-                                          # feature-engineering-service.md §4.4
-                                          # for the authoritative bootstrap
+  argocd/                   AppProjects, Applications, NodePort service
+  crds/                     Phase 6 — CRDs (scaffold)
+  manifests/                afie-system manifests + kustomization.yaml:
+                            telemetry, feature engineering, Postgres, PVCs,
+                            sealed secret, NetworkPolicies, PDBs,
+                            ServiceMonitor, resource defaults, nginx test
   monitoring/               kube-prometheus-stack Helm values
-  argocd/                   ArgoCD Application + NodePort service
+  overlays/dev/             Includes the base only; no image tags pinned yet
 ```
 
 The operator (Phase 6) is designed to open PRs against
-`infra/gitops/manifests/`; keeping manifests plain (no Kustomize / Helm
-templating at the leaf) makes the diff in each PR trivially reviewable.
+`infra/gitops/manifests/`; workload manifests stay plain so each PR diff is
+easy to review.
 
 ## 6. Test workload
 
@@ -118,10 +115,11 @@ See [doc.md](doc.md) for credentials. Everything can run behind
 
 | Service | Local URL |
 | --- | --- |
-| Argo CD | https://localhost:8080 |
+| Argo CD | http://localhost:8080 |
 | Grafana | http://localhost:3000 |
 | Prometheus | http://localhost:9090 |
-| Telemetry service | http://localhost:8080/health (mutually exclusive with Argo CD — use different port) |
+| Telemetry service | port-forward to a free port, e.g. 8082 (8080 is Argo CD) |
+| Feature engineering | port-forward to 8081 |
 
 ## 8. Phase 8 (planned) — Azure
 
@@ -134,21 +132,8 @@ same manifests on KIND. See [roadmap.md](roadmap.md).
 
 ## 9. Secrets
 
-Phase 4's feature-engineering service reads its Postgres connection
-string from a Kubernetes `Secret`. There is no committed secret file —
-the bootstrap is a single command run once per cluster:
-
-```bash
-PG_PASSWORD="$(openssl rand -hex 12)"
-kubectl -n afie-system create secret generic afie-postgres \
-  --from-literal=POSTGRES_DB=afie \
-  --from-literal=POSTGRES_USER=afie \
-  --from-literal=POSTGRES_PASSWORD="$PG_PASSWORD" \
-  --from-literal=CONNECTION_STRING="Host=afie-postgres;Port=5432;Database=afie;Username=afie;Password=$PG_PASSWORD"
-```
-
-The same `Secret` supplies `POSTGRES_*` to the StatefulSet via `envFrom`
-and `CONNECTION_STRING` to the FE deployment via `secretKeyRef` — one
-command, one rotation surface. See
-[feature-engineering-service.md §4.4](feature-engineering-service.md#44-secret-bootstrap)
-for rotation and the Phase 8 Azure Key Vault CSI plan.
+The Postgres credentials are committed only as the encrypted
+`afie-postgres.sealed.yaml`. One `Secret` supplies `POSTGRES_*` to the
+StatefulSet and `CONNECTION_STRING` to feature engineering. Re-sealing for a new
+cluster and rotation are in
+[feature-engineering-service.md §4.4](feature-engineering-service.md#44-secret-bootstrap).
