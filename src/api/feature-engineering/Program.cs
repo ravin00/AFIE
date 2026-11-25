@@ -7,6 +7,7 @@ using AFIE.FeatureEngineering.Publishers;
 using AFIE.FeatureEngineering.Services;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Npgsql;
+using Prometheus;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -73,6 +74,8 @@ builder.Services.AddHealthChecks()
 
 var app = builder.Build();
 
+app.UseHttpMetrics();
+
 app.MapHealthChecks("/health", new HealthCheckOptions
 {
     ResponseWriter = FeatureEngineeringHealthCheck.WriteResponse
@@ -86,6 +89,7 @@ app.MapHealthChecks("/readiness", new HealthCheckOptions
     ResponseWriter = FeatureEngineeringHealthCheck.WriteResponse
 });
 app.MapStateEndpoints();
+app.MapMetrics();  // Prometheus scrape endpoint at /metrics
 
 await app.Services.GetRequiredService<IStateVectorPublisher>()
     .EnsureReadyAsync(CancellationToken.None);
