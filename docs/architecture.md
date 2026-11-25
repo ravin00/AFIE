@@ -109,7 +109,7 @@ sequenceDiagram
 
 The RL agent's observation space is `Box(-1, 1, shape=(55,))`. Feature
 engineering produces the vector from live `MetricEvent`s. Training will use the
-Azure Public Dataset, but the conversion script to this schema does not exist
+Azure Public Dataset V2 (VM traces 2019), but the conversion script to this schema does not exist
 yet. Feature names live in
 [`feature_names.py`](../src/ml/afie_ml/feature_names.py).
 

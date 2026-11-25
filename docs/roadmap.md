@@ -5,6 +5,10 @@ numbers refer to that document.
 
 ## Open items from Phases 2–4
 
+Several of these (2.6, 3.17 hardening, egress and `/metrics`) were done on
+`main` at `527c6b6` and dropped by merge `2bc8f5c`; restore them from that
+commit.
+
 - **2.6** Pin the Argo CD version; the setup script installs `stable`.
 - **2.12** Pin image tags in `infra/gitops/overlays/dev`.
 - **3.17** Telemetry: non-root user and read-only root filesystem; egress
@@ -15,7 +19,6 @@ numbers refer to that document.
 - **4.16** C# ↔ Python schema contract test; live price source and stateful
   detection.
 - **4.17** Forecast features: four extra dims (→ 59).
-- Merge the branch to `main`, which Argo CD tracks.
 
 ## Phase 5 — Reinforcement Learning Agent (weeks 11–15) — in progress
 
@@ -24,7 +27,7 @@ offline PPO trainer.
 
 **Remaining.**
 
-- Azure Public Dataset download and Parquet conversion.
+- Azure Public Dataset V2 (VM traces 2019) download and Parquet conversion.
 - Action masking with `sb3-contrib` MaskablePPO; Lagrangian SLO constraint.
 - Full 1M-step training run; record the schema dimension in `metadata.json`.
 - Online fine-tuning (70/30 live/offline) and training analysis notebook.

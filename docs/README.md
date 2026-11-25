@@ -22,8 +22,7 @@ plan is `AFIE_Workflow_v4.docx`, kept outside the repository by its owner.
 
 ## Current status
 
-As of 25 November 2026, on branch `feat/phase5-ml-offline-train`. `main` is
-behind this branch and still emits a 47-dim state vector.
+As of 25 November 2026, on `main`.
 
 - **Phase 1 (env + monorepo):** complete
 - **Phase 2 (KIND + Prometheus/Grafana + Argo CD):** built; Argo CD version pin and image tags open
