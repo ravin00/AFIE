@@ -27,8 +27,7 @@ public class PrometheusHttpClient
 
             if (parsed?.Status != "success" || parsed.Data is null)
             {
-                _logger.LogWarning("Prometheus query failed: {Error}", parsed?.Error);
-                return [];
+                throw new InvalidOperationException($"Prometheus query failed: {parsed?.Error}");
             }
 
             return parsed.Data.Result;
@@ -36,7 +35,7 @@ public class PrometheusHttpClient
         catch (Exception ex)
         {
             _logger.LogError(ex, "Prometheus query failed for: {Query}", query);
-            return [];
+            throw;
         }
     }
 
@@ -55,8 +54,7 @@ public class PrometheusHttpClient
 
             if (parsed?.Status != "success" || parsed.Data is null)
             {
-                _logger.LogWarning("Prometheus range query failed: {Error}", parsed?.Error);
-                return [];
+                throw new InvalidOperationException($"Prometheus range query failed: {parsed?.Error}");
             }
 
             return parsed.Data.Result;
@@ -64,7 +62,7 @@ public class PrometheusHttpClient
         catch (Exception ex)
         {
             _logger.LogError(ex, "Prometheus range query failed for: {Query}", query);
-            return [];
+            throw;
         }
     }
 }

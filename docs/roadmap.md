@@ -5,17 +5,11 @@ numbers refer to that document.
 
 ## Open items from Phases 2–4
 
-Several of these (2.6, 3.17 hardening, egress and `/metrics`) were done on
-`main` at `527c6b6` and dropped by merge `2bc8f5c`; restore them from that
-commit.
-
-- **2.6** Pin the Argo CD version; the setup script installs `stable`.
 - **2.12** Pin image tags in `infra/gitops/overlays/dev`.
-- **3.17** Telemetry: non-root user and read-only root filesystem; egress
-  NetworkPolicy to Prometheus; `/metrics` plus Service labels for the
-  ServiceMonitor; node pressure queries; per-container requests and limits.
-- **Health** `/health` stays healthy when Prometheus is down (see
-  [telemetry-service.md §6](telemetry-service.md#6-failure-modes-and-operational-notes)).
+- **3.17** Verify the hardened telemetry pod, egress policy, `/metrics` scrape
+  and CPU pressure query end to end on KIND.
+- Telemetry request, error and latency queries expect `http_requests_total`;
+  the .NET services export `http_requests_received_total`.
 - **4.16** C# ↔ Python schema contract test; live price source and stateful
   detection.
 - **4.17** Forecast features: four extra dims (→ 59).

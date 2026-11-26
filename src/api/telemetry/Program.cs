@@ -4,6 +4,7 @@ using AFIE.Telemetry.Models;
 using AFIE.Telemetry.Publishers;
 using AFIE.Telemetry.Services;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Prometheus;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -38,9 +39,12 @@ builder.Services.AddHealthChecks()
 
 var app = builder.Build();
 
+app.UseHttpMetrics();
+
 app.MapHealthChecks("/health", new HealthCheckOptions
 {
     ResponseWriter = TelemetryHealthCheck.WriteResponse
 });
+app.MapMetrics();  // Prometheus scrape endpoint at /metrics
 
 app.Run();

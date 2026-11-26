@@ -209,10 +209,10 @@ volumes at those paths without permission issues.
 - **Pod affinity** requires co-location with the `afie-telemetry` pod on
   the same node — both mount the shared `afie-telemetry-data` RWO PVC.
 - **Security context**: non-root uid 1654, all capabilities dropped, `allowPrivilegeEscalation:
-  false`, `seccompProfile: RuntimeDefault`.
+  false`, read-only root filesystem, `seccompProfile: RuntimeDefault`.
 - **Volumes**: `telemetry-in` → PVC `afie-telemetry-data` read-only at
   `/app/data`; `fe-state` → PVC `afie-fe-state` at
-  `/app/experiments/state`.
+  `/app/experiments/state`; `emptyDir` at `/tmp`.
 - **Env**: `ConsumerMode=local`, `PublisherMode=postgres`,
   `InputPath=/app/data`, `OffsetStatePath=/app/experiments/state/…`,
   `PostgresConnectionString` from `secretKeyRef: {name: afie-postgres,
@@ -255,8 +255,8 @@ by the FE deployment via `secretKeyRef`). It is committed encrypted as
 `afie-postgres.sealed.yaml`.
 
 SealedSecrets decrypt only on the cluster that sealed them, so a new cluster
-needs a re-seal (requires `kubeseal` and a running sealed-secrets controller,
-which `setup-phase2.sh` does not install):
+needs a re-seal (requires `kubeseal`, plus the sealed-secrets controller that
+`setup-phase2.sh` installs):
 
 ```bash
 POSTGRES_USER=afie POSTGRES_DB=afie POSTGRES_PASSWORD="$(openssl rand -hex 12)" scripts/seal-postgres-secret.sh

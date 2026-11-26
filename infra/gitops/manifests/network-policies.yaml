@@ -39,3 +39,15 @@ spec:
       ports: [{ port: 8080 }]
 # fe-http removed: kubelet health probes bypass NetworkPolicy, and prometheus
 # scrape is covered by allow-prom-scrape. No other client needs pod IP:8080.
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: telemetry-to-prometheus, namespace: afie-system }
+spec:
+  podSelector: { matchLabels: { app: afie-telemetry } }
+  policyTypes: [Egress]
+  # Telemetry queries Prometheus in the monitoring namespace. DNS egress is
+  # already granted to every pod by default-deny.
+  egress:
+    - to: [{ namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: monitoring } } }]
+      ports: [{ port: 9090 }]
